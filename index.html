@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>MiStream — Prove What You're Made Of</title>
+<link rel="stylesheet" href="style.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════
+     AUTH SCREENS
+═══════════════════════════════════ -->
+<div id="auth-screen" class="fullscreen">
+  <!-- SPLASH -->
+  <div id="splash" class="splash">
+    <div class="splash-glow"></div>
+    <div class="splash-grid"></div>
+    <div class="splash-content">
+      <div class="splash-logo">
+        <span class="logo-mi">MI</span><span class="logo-stream">STREAM</span>
+      </div>
+      <div class="splash-tagline">Prove what you're made of.</div>
+      <div class="splash-loader"><div class="loader-bar"></div></div>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="login-view" class="auth-view hidden">
+    <div class="auth-header">
+      <div class="auth-logo"><span class="logo-mi">MI</span><span class="logo-stream">STREAM</span></div>
+      <p class="auth-sub">Where creators prove themselves.</p>
+    </div>
+    <div class="auth-card">
+      <h2 class="auth-title">Welcome back</h2>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="login-email" placeholder="you@email.com"/>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="login-password" placeholder="••••••••"/>
+      </div>
+      <div id="login-error" class="error-msg hidden"></div>
+      <button class="btn-primary" onclick="handleLogin()">
+        <span>Sign In</span><i class="fa-solid fa-arrow-right"></i>
+      </button>
+      <div class="auth-divider"><span>or</span></div>
+      <button class="btn-secondary" onclick="showView('register-view')">Create Account</button>
+    </div>
+  </div>
+
+  <!-- REGISTER -->
+  <div id="register-view" class="auth-view hidden">
+    <div class="auth-header">
+      <div class="auth-logo"><span class="logo-mi">MI</span><span class="logo-stream">STREAM</span></div>
+      <p class="auth-sub">Claim your niche identity.</p>
+    </div>
+    <div class="auth-card">
+      <h2 class="auth-title">Create Account</h2>
+      <div class="form-group">
+        <label>Your Name</label>
+        <input type="text" id="reg-name" placeholder="e.g. Stuart" oninput="updateUsernamePreview()"/>
+      </div>
+      <div class="form-group">
+        <label>Your Niche</label>
+        <div class="niche-picker" id="niche-picker">
+          <div class="niche-opt" data-niche="comedy" onclick="selectNiche(this)"><i class="fa-solid fa-masks-theater"></i><span>Comedy</span></div>
+          <div class="niche-opt" data-niche="trading" onclick="selectNiche(this)"><i class="fa-solid fa-chart-line"></i><span>Trading</span></div>
+          <div class="niche-opt" data-niche="music" onclick="selectNiche(this)"><i class="fa-solid fa-music"></i><span>Music</span></div>
+          <div class="niche-opt" data-niche="fashion" onclick="selectNiche(this)"><i class="fa-solid fa-shirt"></i><span>Fashion</span></div>
+          <div class="niche-opt" data-niche="football" onclick="selectNiche(this)"><i class="fa-solid fa-futbol"></i><span>Football</span></div>
+          <div class="niche-opt" data-niche="fitness" onclick="selectNiche(this)"><i class="fa-solid fa-dumbbell"></i><span>Fitness</span></div>
+          <div class="niche-opt" data-niche="travel" onclick="selectNiche(this)"><i class="fa-solid fa-plane"></i><span>Travel</span></div>
+          <div class="niche-opt" data-niche="gaming" onclick="selectNiche(this)"><i class="fa-solid fa-gamepad"></i><span>Gaming</span></div>
+        </div>
+      </div>
+      <div class="username-preview hidden" id="username-preview">
+        <span class="up-label">Your identity</span>
+        <span class="up-name" id="up-name">you@niche</span>
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="reg-email" placeholder="you@email.com"/>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="reg-password" placeholder="At least 6 characters"/>
+      </div>
+      <div id="reg-error" class="error-msg hidden"></div>
+      <button class="btn-primary" onclick="handleRegister()">
+        <span>Claim My Identity</span><i class="fa-solid fa-arrow-right"></i>
+      </button>
+      <div class="auth-divider"><span>or</span></div>
+      <button class="btn-secondary" onclick="showView('login-view')">Sign In Instead</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     MAIN APP
+═══════════════════════════════════ -->
+<div id="app" class="hidden">
+
+  <!-- TOP BAR -->
+  <div class="topbar" id="topbar">
+    <div class="topbar-logo"><span class="logo-mi">MI</span><span class="logo-stream">STREAM</span></div>
+    <div class="topbar-right">
+      <div class="notif-btn" onclick="showPage('notifications')">
+        <i class="fa-regular fa-bell"></i>
+        <span class="notif-badge hidden" id="notif-badge"></span>
+      </div>
+      <div class="user-av" id="topbar-av" onclick="showPage('profile')"></div>
+    </div>
+  </div>
+
+  <!-- PAGES -->
+  <div class="pages" id="pages">
+
+    <!-- ═══ FEED PAGE ═══ -->
+    <div class="page active" id="page-feed">
+      <div class="niche-rail" id="niche-rail">
+        <div class="nr-pill active" data-niche="all" onclick="filterFeed(this)">All</div>
+        <div class="nr-pill" data-niche="comedy" onclick="filterFeed(this)"><i class="fa-solid fa-masks-theater"></i> Comedy</div>
+        <div class="nr-pill" data-niche="trading" onclick="filterFeed(this)"><i class="fa-solid fa-chart-line"></i> Trading</div>
+        <div class="nr-pill" data-niche="music" onclick="filterFeed(this)"><i class="fa-solid fa-music"></i> Music</div>
+        <div class="nr-pill" data-niche="fashion" onclick="filterFeed(this)"><i class="fa-solid fa-shirt"></i> Fashion</div>
+        <div class="nr-pill" data-niche="football" onclick="filterFeed(this)"><i class="fa-solid fa-futbol"></i> Football</div>
+        <div class="nr-pill" data-niche="fitness" onclick="filterFeed(this)"><i class="fa-solid fa-dumbbell"></i> Fitness</div>
+        <div class="nr-pill" data-niche="travel" onclick="filterFeed(this)"><i class="fa-solid fa-plane"></i> Travel</div>
+        <div class="nr-pill" data-niche="gaming" onclick="filterFeed(this)"><i class="fa-solid fa-gamepad"></i> Gaming</div>
+      </div>
+      <div class="feed-list" id="feed-list">
+        <div class="feed-loading"><div class="spin"></div><span>Loading your niche...</span></div>
+      </div>
+    </div>
+
+    <!-- ═══ CHALLENGES PAGE ═══ -->
+    <div class="page" id="page-challenges">
+      <div class="page-header">
+        <h2><i class="fa-solid fa-shield-halved"></i> Challenges</h2>
+        <button class="btn-icon" onclick="showCreateChallenge()"><i class="fa-solid fa-plus"></i></button>
+      </div>
+      <div class="chal-tabs">
+        <div class="ctab active" onclick="setChalTab(this,'incoming')">Incoming</div>
+        <div class="ctab" onclick="setChalTab(this,'sent')">Sent</div>
+        <div class="ctab" onclick="setChalTab(this,'active')">Active</div>
+      </div>
+      <div id="chal-list" class="chal-list">
+        <div class="feed-loading"><div class="spin"></div><span>Loading challenges...</span></div>
+      </div>
+    </div>
+
+    <!-- ═══ POST PAGE ═══ -->
+    <div class="page" id="page-post">
+      <div class="page-header"><h2><i class="fa-solid fa-plus"></i> New Post</h2></div>
+      <div class="post-form">
+        <div class="post-identity" id="post-identity"></div>
+        <div class="media-upload" id="media-upload" onclick="document.getElementById('media-input').click()">
+          <i class="fa-solid fa-photo-film"></i>
+          <span>Tap to add photo or video</span>
+          <input type="file" id="media-input" accept="image/*,video/*" hidden onchange="previewMedia(this)"/>
+        </div>
+        <div id="media-preview" class="hidden"></div>
+        <div class="form-group">
+          <label>Caption</label>
+          <textarea id="post-caption" placeholder="What are you proving today?" rows="4" maxlength="300"></textarea>
+          <span class="char-count" id="char-count">0/300</span>
+        </div>
+        <div class="form-group">
+          <label>Niche</label>
+          <select id="post-niche" class="select-input"></select>
+        </div>
+        <div id="post-error" class="error-msg hidden"></div>
+        <button class="btn-primary" onclick="handlePost()">
+          <span>Publish Post</span><i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- ═══ EXPLORE PAGE ═══ -->
+    <div class="page" id="page-explore">
+      <div class="page-header"><h2><i class="fa-solid fa-compass"></i> Explore</h2></div>
+      <div class="search-bar">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="search-input" placeholder="Search creators by username or niche..." oninput="handleSearch(this.value)"/>
+      </div>
+      <div id="explore-list" class="explore-list">
+        <div class="explore-empty">
+          <i class="fa-solid fa-users"></i>
+          <p>Search for creators in your niche</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PROFILE PAGE ═══ -->
+    <div class="page" id="page-profile">
+      <div id="profile-content"></div>
+    </div>
+
+    <!-- ═══ NOTIFICATIONS PAGE ═══ -->
+    <div class="page" id="page-notifications">
+      <div class="page-header"><h2><i class="fa-regular fa-bell"></i> Notifications</h2></div>
+      <div id="notif-list" class="notif-list"></div>
+    </div>
+
+    <!-- ═══ VIEW POST PAGE ═══ -->
+    <div class="page" id="page-viewpost">
+      <div class="page-header back-header">
+        <button class="back-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button>
+        <h2>Post</h2>
+      </div>
+      <div id="viewpost-content"></div>
+    </div>
+
+    <!-- ═══ VIEW PROFILE PAGE ═══ -->
+    <div class="page" id="page-viewprofile">
+      <div class="page-header back-header">
+        <button class="back-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button>
+        <h2>Profile</h2>
+      </div>
+      <div id="viewprofile-content"></div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bnav">
+    <div class="bni active" id="bni-feed" onclick="showPage('feed')">
+      <i class="fa-solid fa-clapperboard"></i>
+      <span>Feed</span>
+    </div>
+    <div class="bni" id="bni-challenges" onclick="showPage('challenges')">
+      <i class="fa-solid fa-shield-halved"></i>
+      <span>Challenges</span>
+    </div>
+    <div class="bni-plus" onclick="showPage('post')">
+      <i class="fa-solid fa-plus"></i>
+    </div>
+    <div class="bni" id="bni-explore" onclick="showPage('explore')">
+      <i class="fa-solid fa-compass"></i>
+      <span>Explore</span>
+    </div>
+    <div class="bni" id="bni-profile" onclick="showPage('profile')">
+      <i class="fa-regular fa-user"></i>
+      <span>Me</span>
+    </div>
+  </div>
+
+  <!-- GIFT MODAL -->
+  <div class="modal-overlay hidden" id="gift-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-coins"></i> Gift This Creator</h3>
+        <button class="modal-close" onclick="closeModal('gift-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="gift-info">
+        <div class="gift-creator" id="gift-creator-name"></div>
+        <div class="gift-amounts">
+          <div class="gift-opt" onclick="selectGift(this,50)"><i class="fa-solid fa-star"></i><span>50</span><small>coins</small></div>
+          <div class="gift-opt" onclick="selectGift(this,100)"><i class="fa-solid fa-fire"></i><span>100</span><small>coins</small></div>
+          <div class="gift-opt" onclick="selectGift(this,200)"><i class="fa-solid fa-gem"></i><span>200</span><small>coins</small></div>
+          <div class="gift-opt" onclick="selectGift(this,500)"><i class="fa-solid fa-crown"></i><span>500</span><small>coins</small></div>
+        </div>
+        <div class="gift-coming">
+          <i class="fa-solid fa-info-circle"></i>
+          <p>Real Mobile Money gifting launches in V1. Your tap tells us you'd genuinely support this creator — and we're counting every one.</p>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="confirmGift()">
+        <i class="fa-solid fa-coins"></i> <span>Send Gift Intent</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- CHALLENGE MODAL -->
+  <div class="modal-overlay hidden" id="challenge-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-shield-halved"></i> Issue a Challenge</h3>
+        <button class="modal-close" onclick="closeModal('challenge-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="challenge-modal-body">
+        <div class="chal-to" id="chal-to-label"></div>
+        <div class="form-group">
+          <label>Choose one of your posts as your entry</label>
+          <div id="my-posts-picker" class="posts-picker"></div>
+        </div>
+        <div class="form-group">
+          <label>Challenge Message</label>
+          <textarea id="chal-message" placeholder="Tell them what this challenge is about..." rows="3" maxlength="150"></textarea>
+        </div>
+        <div class="chal-coming">
+          <i class="fa-solid fa-info-circle"></i>
+          <p>Live 1v1 challenge voting launches in V1. This sends a real challenge request — they'll see it and can accept.</p>
+        </div>
+        <button class="btn-primary" onclick="confirmChallenge()">
+          <i class="fa-solid fa-shield-halved"></i> <span>Send Challenge</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CREATE CHALLENGE MODAL -->
+  <div class="modal-overlay hidden" id="create-challenge-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-shield-halved"></i> Challenge Someone</h3>
+        <button class="modal-close" onclick="closeModal('create-challenge-modal')"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="form-group">
+        <label>Search creator to challenge</label>
+        <input type="text" id="challenge-search" placeholder="Search by username..." oninput="searchChallengee(this.value)"/>
+        <div id="challenge-search-results" class="search-results"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div class="toast hidden" id="toast"></div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<!--<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>-->
+<script src="app.js"></script>
+</body>
+</html>

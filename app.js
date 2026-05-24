@@ -237,6 +237,8 @@ async function doRegister() {
       followers: 0, following: 0, postCount: 0, sessionCount: 0,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
+    
+    showScreen('feed')
   } catch(e) {
     showErr(err, friendlyErr(e.code));
     btn.innerHTML = '<span>Claim My Identity</span><i class="fa-solid fa-arrow-right"></i>';
@@ -252,6 +254,8 @@ async function doLogin() {
   if (!email || !pass) { showErr(err,'Fill in all fields.'); return; }
   try {
     await auth.signInWithEmailAndPassword(email, pass);
+    
+    showScreen('feed')
   } catch(e) {
     showErr(err, friendlyErr(e.code));
   }
@@ -837,9 +841,7 @@ function viewC1v1(id, d) {
             <div class="v1v1-bar"><div class="v1v1-bar-fill" id="cr-bar" style="width:${crPct}%"></div></div>
           </div>
         </div>
-        <div style="display:flex;align-items:center;justify-content:center;">
-          <div class="v1v1-vs-lbl">VS</div>
-        </div>
+       
         <div class="v1v1-side">
           ${ceMediaHTML}
           <div class="v1v1-media-ov">
@@ -1295,13 +1297,25 @@ async function submitComment() {
   await postComment(currentCommentTarget.collection, currentCommentTarget.docId, text);
 }
 
-async function submitInlineComment(collection, docId, inputId, listId) {
+/*async function submitInlineComment(collection, docId, inputId, listId) {
   const input = document.getElementById(inputId);
   const text = input.value.trim();
   if (!text) return;
   input.value=''; document.getElementById(inputId.replace('input','send')+'-send').disabled=true;
   await postComment(collection, docId, text);
   // Reload inline
+  loadInlineComments(collection, docId, listId);
+}*/
+async function submitInlineComment(collection, docId, inputId, listId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  const sendId = inputId.replace('com-input', 'com-send').replace('input', 'send');
+  const sendBtn = document.getElementById(sendId);
+  if (sendBtn) sendBtn.disabled = true;
+  await postComment(collection, docId, text);
   loadInlineComments(collection, docId, listId);
 }
 

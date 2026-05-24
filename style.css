@@ -462,7 +462,7 @@ html,body{height:100%;overflow:hidden;font-family:'Syne',sans-serif;background:v
 .bnav{position:fixed;bottom:0;left:0;right:0;height:62px;background:var(--black);border-top:1px solid var(--bord);display:flex;align-items:center;padding:0 4px 8px;z-index:100;}
 .bn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;padding:4px 0;}
 .bn i{font-size:19px;color:rgba(255,255,255,.3);transition:color .2s;}
-.bn span{font-family:'Space Mono',monospace;font-size:7px;color:rgba(255,255,255,.25);letter-spacing:.5px;}
+.bn span{font-family:'Space Mono',monospace;font-size:12px;color:rgba(255,255,255,.25);letter-spacing:.5px;}
 .bn.active i,.bn.active span{color:var(--or)!important;}
 .bn-plus{flex:0.8;display:flex;justify-content:center;align-items:center;}
 .bn-plus > i,.bn-plus-inner{width:46px;height:46px;background:linear-gradient(135deg,var(--or),var(--go));border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 18px rgba(255,92,26,.4);margin-top:-10px;}

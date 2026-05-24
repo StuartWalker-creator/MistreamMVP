@@ -130,7 +130,7 @@ function initApp() {
   // Show feed
   showScreen('feed');
 }
-
+//firebase.auth().signOut()
 function updateTopAvatar() {
   const av = document.getElementById('top-av');
   if (CUD.photoURL) {

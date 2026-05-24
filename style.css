@@ -145,7 +145,7 @@ html,body{height:100%;overflow:hidden;font-family:'Syne',sans-serif;background:v
 .tk-meta-info{flex:1;min-width:0;}
 .tk-name{font-size:15px;font-weight:700;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .tk-urow{display:flex;align-items:center;gap:5px;margin-top:1px;}
-.tk-user{font-family:'Space Mono',monospace;font-size:11px;color:rgba(255,255,255,.55);}
+.tk-user{font-family:Arial,sans-setif;font-size:11px;color:rgba(255,255,255,.55);}
 .tk-lvl{display:inline-flex;align-items:center;gap:3px;background:rgba(0,0,0,.35);border:1px solid rgba(255,92,26,.35);padding:1px 7px;border-radius:20px;}
 .tk-lvl i{font-size:7px;color:var(--go);}
 .tk-lvl span{font-family:'Space Mono',monospace;font-size:8px;color:var(--go);font-weight:700;letter-spacing:.5px;}

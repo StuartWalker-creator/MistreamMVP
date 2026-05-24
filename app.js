@@ -796,17 +796,41 @@ function viewC1v1(id, d) {
   const crPct = totalVotes ? Math.round((d.challengerVotes||0)/totalVotes*100) : 50;
   const cePct = 100 - crPct;
 
-  const crMediaHTML = d.challengerMediaURL
-    ? (d.challengerMediaType==='video'
-        ? `<div class="v1v1-media-wrap"><video src="${d.challengerMediaURL}" loop muted playsinline style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;" onclick="this.paused?this.play():this.pause()"></video></div>`
-        : `<div class="v1v1-media-wrap"><img src="${d.challengerMediaURL}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;"/></div>`)
-    : `<div class="v1v1-media-wrap" style="background:var(--deep);"><span style="font-size:40px;">${NICHE_EMOJIS[d.niche]||'🎬'}</span></div>`;
+ const crMediaHTML = d.challengerMediaURL
+  ? (d.challengerMediaType === 'video'
+      ? `<div class="v1v1-media-wrap" id="cr-wrap">
+           <video id="cr-video" src="${d.challengerMediaURL}" playsinline muted preload="auto"
+             style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;"
+             onclick="toggleChalVideo('cr','ce')"
+             onended="switchChalVideo('ce')">
+           </video>
+           <div class="chal-mute-btn" id="cr-mute" onclick="toggleChalMute(event)">
+             <i class="fa-solid fa-volume-xmark"></i>
+           </div>
+           <div class="chal-play-indicator" id="cr-indicator">
+             <i class="fa-solid fa-play"></i>
+           </div>
+         </div>`
+      : `<div class="v1v1-media-wrap"><img src="${d.challengerMediaURL}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;"/></div>`)
+  : `<div class="v1v1-media-wrap" style="background:var(--deep);display:flex;align-items:center;justify-content:center;"><span style="font-size:40px;">${NICHE_EMOJIS[d.niche]||'🎬'}</span></div>`;
 
-  const ceMediaHTML = d.challengeeMediaURL
-    ? (d.challengeeMediaType==='video'
-        ? `<div class="v1v1-media-wrap"><video src="${d.challengeeMediaURL}" loop muted playsinline style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;" onclick="this.paused?this.play():this.pause()"></video></div>`
-        : `<div class="v1v1-media-wrap"><img src="${d.challengeeMediaURL}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;"/></div>`)
-    : `<div class="v1v1-media-wrap" style="background:var(--deep);"><span style="font-size:28px;color:rgba(255,255,255,.3);">${isPending?'⏳ Waiting...':'No entry'}</span></div>`;
+const ceMediaHTML = d.challengeeMediaURL
+  ? (d.challengeeMediaType === 'video'
+      ? `<div class="v1v1-media-wrap" id="ce-wrap">
+           <video id="ce-video" src="${d.challengeeMediaURL}" playsinline muted preload="auto"
+             style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;"
+             onclick="toggleChalVideo('ce','cr')"
+             onended="switchChalVideo('cr')">
+           </video>
+           <div class="chal-mute-btn" id="ce-mute" onclick="toggleChalMute(event)">
+             <i class="fa-solid fa-volume-xmark"></i>
+           </div>
+           <div class="chal-play-indicator" id="ce-indicator">
+             <i class="fa-solid fa-pause"></i>
+           </div>
+         </div>`
+      : `<div class="v1v1-media-wrap"><img src="${d.challengeeMediaURL}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;"/></div>`)
+  : `<div class="v1v1-media-wrap" style="background:var(--deep);display:flex;align-items:center;justify-content:center;"><span style="font-size:28px;color:rgba(255,255,255,.3);">${isPending?'⏳ Waiting...':'No entry'}</span></div>`;
 
   let actionHTML = '';
   if (isPending && iAmChallengee) {
@@ -867,6 +891,7 @@ function viewC1v1(id, d) {
     </div>`;
   loadInlineComments('challenges', id, 'v1v1-comments');
   checkVoted1v1(id);
+  setTimeout(() => initChalVideos(), 300);
 }
 
 async function acceptC1v1(chalId) {
@@ -1283,7 +1308,7 @@ function loadCommentsFull() {
     .onSnapshot(snap => {
       if (snap.empty) { list.innerHTML='<div class="com-empty"><i class="fa-regular fa-comment-dots"></i><p>No comments yet. Be the first!</p></div>'; return; }
       list.innerHTML='';
-      snap.forEach(doc => list.appendChild(buildComment(doc.data())));
+      snap.forEach(doc => list.appendChild(buildComment(doc.data(), doc.id, currentCommentTarget.collection, currentCommentTarget.docId)));
       list.scrollTop=list.scrollHeight;
     });
 }
@@ -1337,18 +1362,53 @@ function loadInlineComments(collection, docId, listId) {
   db.collection(collection).doc(docId).collection('comments').orderBy('createdAt','asc').limit(20)
     .onSnapshot(snap => {
       if (snap.empty) { list.innerHTML='<div class="com-empty" style="padding:20px;"><i class="fa-regular fa-comment-dots" style="font-size:24px;"></i><p style="font-size:12px;">No comments yet.</p></div>'; return; }
-      list.innerHTML=''; snap.forEach(doc=>list.appendChild(buildComment(doc.data()))); list.scrollTop=list.scrollHeight;
+      list.innerHTML=''; snap.forEach(doc => list.appendChild(buildComment(doc.data(), doc.id, collection, docId)));
+      list.scrollTop=list.scrollHeight;
     });
 }
 
-function buildComment(d) {
+function buildComment(d, commentId, collection, docId) {
   const div = document.createElement('div');
   div.className = 'com-item';
-  const avHTML = d.authorPhoto?`<div class="com-av"><img src="${d.authorPhoto}"/></div>`:`<div class="com-av">${(d.authorName||'?').charAt(0).toUpperCase()}</div>`;
-  div.innerHTML=`${avHTML}<div class="com-body"><div class="com-hdr"><span class="com-name">${esc(d.authorName)}</span><span class="com-un">${esc(d.authorUsername)}</span><span class="com-time">${d.createdAt?timeAgo(d.createdAt.toDate()):'now'}</span></div><div class="com-text">${esc(d.text)}</div></div>`;
+  div.dataset.commentId = commentId;
+  const avHTML = d.authorPhoto
+    ? `<div class="com-av"><img src="${d.authorPhoto}"/></div>`
+    : `<div class="com-av">${(d.authorName||'?').charAt(0).toUpperCase()}</div>`;
+  div.innerHTML = `
+    ${avHTML}
+    <div class="com-body">
+      <div class="com-hdr">
+        <span class="com-name">${esc(d.authorName)}</span>
+        <span class="com-un">${esc(d.authorUsername)}</span>
+        <span class="com-time">${d.createdAt ? timeAgo(d.createdAt.toDate()) : 'now'}</span>
+      </div>
+      <div class="com-text">${esc(d.text)}</div>
+      <div class="com-actions">
+        <button class="reply-btn" onclick="toggleReplyBox('${commentId}','${esc(d.authorUsername)}','${collection}','${docId}')">
+          <i class="fa-solid fa-reply"></i> Reply
+        </button>
+        <span class="reply-count" id="rc-${commentId}"></span>
+      </div>
+      <div class="reply-input-wrap hidden" id="ri-${commentId}">
+        <div class="reply-input-row">
+          <div class="com-av-sm">${CUD.photoURL?`<img src="${CUD.photoURL}"/>`:(CUD.displayName||'?').charAt(0).toUpperCase()}</div>
+          <div class="com-input-wrap" style="flex:1;">
+            <input type="text" id="rit-${commentId}" placeholder="Replying to ${esc(d.authorUsername)}..." maxlength="200"
+              oninput="document.getElementById('rsb-${commentId}').disabled=!this.value.trim()"/>
+            <button id="rsb-${commentId}" class="com-send-btn" disabled
+              onclick="submitReply('${collection}','${docId}','${commentId}','rit-${commentId}','replies-${commentId}')">
+              <i class="fa-solid fa-paper-plane"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="replies-list" id="replies-${commentId}"></div>
+    </div>`;
+  // Load replies
+// Load replies after element is in DOM
+  setTimeout(() => loadReplies(collection, docId, commentId), 100);
   return div;
 }
-
 // ═══════════════════════════════════════════
 // GIFT
 // ═══════════════════════════════════════════
@@ -1456,3 +1516,263 @@ document.addEventListener('click',e=>{
 const style=document.createElement('style');
 style.textContent='@keyframes coinPop{0%{opacity:1;transform:scale(1) translateY(0);}100%{opacity:0;transform:scale(.7) translateY(-100px);}}';
 document.head.appendChild(style);
+
+// ── CHALLENGE VIDEO CONTROLS ──
+let chalMuted = true;
+
+function initChalVideos() {
+  const crVid = document.getElementById('cr-video');
+  const ceVid = document.getElementById('ce-video');
+  if (!crVid && !ceVid) return;
+  // Autoplay first video
+  if (crVid) {
+    crVid.muted = true;
+    crVid.play().catch(() => {});
+    setChalActive('cr');
+  }
+  // Pause second
+  if (ceVid) {
+    ceVid.muted = true;
+    ceVid.pause();
+  }
+}
+
+function toggleChalVideo(playId, pauseId) {
+  const playVid = document.getElementById(playId + '-video');
+  const pauseVid = document.getElementById(pauseId + '-video');
+  const playInd = document.getElementById(playId + '-indicator');
+  const pauseInd = document.getElementById(pauseId + '-indicator');
+  if (!playVid) return;
+  if (playVid.paused) {
+    // Resume tapped video, pause the other
+    playVid.play().catch(() => {});
+    if (pauseVid) pauseVid.pause();
+    setChalActive(playId);
+    if (playInd) { playInd.querySelector('i').className = 'fa-solid fa-pause'; flashIndicator(playInd); }
+  } else {
+    // Pause tapped video, play the other
+    playVid.pause();
+    if (pauseVid) { pauseVid.play().catch(() => {}); setChalActive(pauseId); }
+    if (playInd) { playInd.querySelector('i').className = 'fa-solid fa-pause'; flashIndicator(playInd); }
+  }
+}
+
+function switchChalVideo(nextId) {
+  // Called when a video ends — play the other one
+  const nextVid = document.getElementById(nextId + '-video');
+  const otherId = nextId === 'cr' ? 'ce' : 'cr';
+  const otherVid = document.getElementById(otherId + '-video');
+  if (nextVid) {
+    nextVid.muted = chalMuted;
+    nextVid.play().catch(() => {});
+    setChalActive(nextId);
+  }
+  if (otherVid) otherVid.pause();
+}
+
+function setChalActive(activeId) {
+  const posts = document.querySelector('.v1v1-posts');
+  if (!posts) return;
+  posts.classList.remove('cr-active', 'ce-active');
+  posts.classList.add(activeId + '-active');
+}
+
+function toggleChalMute(e) {
+  e.stopPropagation();
+  chalMuted = !chalMuted;
+  const crVid = document.getElementById('cr-video');
+  const ceVid = document.getElementById('ce-video');
+  if (crVid) crVid.muted = chalMuted;
+  if (ceVid) ceVid.muted = chalMuted;
+  document.querySelectorAll('.chal-mute-btn i').forEach(i => {
+    i.className = `fa-solid ${chalMuted ? 'fa-volume-xmark' : 'fa-volume-high'}`;
+  });
+}
+
+function flashIndicator(el) {
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 700);
+}
+
+// ── REPLIES ──
+function toggleReplyBox(commentId, username, collection, docId) {
+  const wrap = document.getElementById(`ri-${commentId}`);
+  if (!wrap) return;
+  const isHidden = wrap.classList.contains('hidden');
+  // Close all other open reply boxes first
+  document.querySelectorAll('.reply-input-wrap').forEach(w => w.classList.add('hidden'));
+  if (isHidden) {
+    wrap.classList.remove('hidden');
+    const input = document.getElementById(`rit-${commentId}`);
+    if (input) input.focus();
+  }
+}
+
+async function submitReply(collection, docId, commentId, inputId, repliesListId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  const sendBtn = document.getElementById(inputId.replace('rit-', 'rsb-'));
+  if (sendBtn) sendBtn.disabled = true;
+  // Save reply to Firestore
+  await db.collection(collection).doc(docId)
+    .collection('comments').doc(commentId)
+    .collection('replies').add({
+      authorId: CU.uid,
+      authorName: CUD.displayName,
+      authorUsername: CUD.username,
+      authorPhoto: CUD.photoURL || null,
+      text,
+      createdAt: ts()
+    });
+  // Update reply count on comment
+  await db.collection(collection).doc(docId)
+    .collection('comments').doc(commentId)
+    .update({ replyCount: firebase.firestore.FieldValue.increment(1) });
+  // Close reply box
+  const wrap = document.getElementById(`ri-${commentId}`);
+  if (wrap) wrap.classList.add('hidden');
+  // Reload replies
+  loadReplies(collection, docId, commentId);
+}
+
+function loadReplies(collection, docId, commentId, depth) {
+  depth = depth || 0;
+  const list = document.getElementById(`replies-${commentId}`);
+  if (!list) return;
+  db.collection(collection).doc(docId)
+    .collection('comments').doc(commentId)
+    .collection('replies')
+    .orderBy('createdAt', 'asc')
+    .onSnapshot(snap => {
+      const countEl = document.getElementById(`rc-${commentId}`);
+      if (countEl) countEl.textContent = snap.size > 0 ? `${snap.size} ${snap.size === 1 ? 'reply' : 'replies'}` : '';
+      if (snap.empty) { list.innerHTML = ''; return; }
+      list.innerHTML = '';
+      snap.forEach(doc => {
+        const d = doc.data();
+        const replyId = doc.id;
+        const item = document.createElement('div');
+        item.className = 'reply-item';
+        item.dataset.replyId = replyId;
+        const avHTML = d.authorPhoto
+          ? `<div class="reply-av"><img src="${d.authorPhoto}"/></div>`
+          : `<div class="reply-av">${(d.authorName||'?').charAt(0).toUpperCase()}</div>`;
+        item.innerHTML = `
+          ${avHTML}
+          <div class="reply-body">
+            <div class="com-hdr">
+              <span class="com-name">${esc(d.authorName)}</span>
+              <span class="com-un">${esc(d.authorUsername)}</span>
+              <span class="com-time">${d.createdAt ? timeAgo(d.createdAt.toDate()) : 'now'}</span>
+            </div>
+            <div class="com-text">${esc(d.text)}</div>
+            ${depth < 3 ? `
+            <div class="com-actions">
+              <button class="reply-btn" onclick="toggleNestedReplyBox('${replyId}','${esc(d.authorUsername)}','${collection}','${docId}','${commentId}')">
+                <i class="fa-solid fa-reply"></i> Reply
+              </button>
+              <span class="reply-count" id="rc-${replyId}"></span>
+            </div>
+            <div class="reply-input-wrap hidden" id="ri-${replyId}">
+              <div class="reply-input-row">
+                <div class="com-av-sm">${CUD.photoURL?`<img src="${CUD.photoURL}"/>`:(CUD.displayName||'?').charAt(0).toUpperCase()}</div>
+                <div class="com-input-wrap" style="flex:1;">
+                  <input type="text" id="rit-${replyId}"
+                    placeholder="Replying to ${esc(d.authorUsername)}..."
+                    maxlength="200"
+                    oninput="document.getElementById('rsb-${replyId}').disabled=!this.value.trim()"/>
+                  <button id="rsb-${replyId}" class="com-send-btn" disabled
+                    onclick="submitNestedReply('${collection}','${docId}','${commentId}','${replyId}','rit-${replyId}','nested-replies-${replyId}')">
+                    <i class="fa-solid fa-paper-plane"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="replies-list nested-replies" id="nested-replies-${replyId}"></div>
+            ` : ''}
+          </div>`;
+        list.appendChild(item);
+        // Load nested replies after element in DOM
+        if (depth < 3) {
+          setTimeout(() => loadNestedReplies(collection, docId, commentId, replyId, depth + 1), 100);
+        }
+      });
+    });
+}
+
+function loadNestedReplies(collection, docId, commentId, replyId, depth) {
+  const list = document.getElementById(`nested-replies-${replyId}`);
+  if (!list) return;
+  db.collection(collection).doc(docId)
+    .collection('comments').doc(commentId)
+    .collection('replies').doc(replyId)
+    .collection('replies')
+    .orderBy('createdAt', 'asc')
+    .onSnapshot(snap => {
+      const countEl = document.getElementById(`rc-${replyId}`);
+      if (countEl) countEl.textContent = snap.size > 0 ? `${snap.size} ${snap.size === 1 ? 'reply' : 'replies'}` : '';
+      if (snap.empty) { list.innerHTML = ''; return; }
+      list.innerHTML = '';
+      snap.forEach(doc => {
+        const d = doc.data();
+        const item = document.createElement('div');
+        item.className = 'reply-item';
+        const avHTML = d.authorPhoto
+          ? `<div class="reply-av"><img src="${d.authorPhoto}"/></div>`
+          : `<div class="reply-av">${(d.authorName||'?').charAt(0).toUpperCase()}</div>`;
+        item.innerHTML = `
+          ${avHTML}
+          <div class="reply-body">
+            <div class="com-hdr">
+              <span class="com-name">${esc(d.authorName)}</span>
+              <span class="com-un">${esc(d.authorUsername)}</span>
+              <span class="com-time">${d.createdAt ? timeAgo(d.createdAt.toDate()) : 'now'}</span>
+            </div>
+            <div class="com-text">${esc(d.text)}</div>
+          </div>`;
+        list.appendChild(item);
+      });
+    });
+}
+
+function toggleNestedReplyBox(replyId, username, collection, docId, commentId) {
+  // Close all open reply boxes
+  document.querySelectorAll('.reply-input-wrap').forEach(w => w.classList.add('hidden'));
+  const wrap = document.getElementById(`ri-${replyId}`);
+  if (wrap) {
+    wrap.classList.remove('hidden');
+    const input = document.getElementById(`rit-${replyId}`);
+    if (input) input.focus();
+  }
+}
+
+async function submitNestedReply(collection, docId, commentId, replyId, inputId, listId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  const sendBtn = document.getElementById(inputId.replace('rit-', 'rsb-'));
+  if (sendBtn) sendBtn.disabled = true;
+  await db.collection(collection).doc(docId)
+    .collection('comments').doc(commentId)
+    .collection('replies').doc(replyId)
+    .collection('replies').add({
+      authorId: CU.uid,
+      authorName: CUD.displayName,
+      authorUsername: CUD.username,
+      authorPhoto: CUD.photoURL || null,
+      text,
+      createdAt: ts()
+    });
+  await db.collection(collection).doc(docId)
+    .collection('comments').doc(commentId)
+    .collection('replies').doc(replyId)
+    .update({ replyCount: firebase.firestore.FieldValue.increment(1) });
+  const wrap = document.getElementById(`ri-${replyId}`);
+  if (wrap) wrap.classList.add('hidden');
+  loadNestedReplies(collection, docId, commentId, replyId, 1);
+}

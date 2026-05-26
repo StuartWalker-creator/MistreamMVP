@@ -1,6 +1,6 @@
-// ═══════════════════════════════════════════
-// FIREBASE CONFIG
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════
 const firebaseConfig = {
   apiKey: "AIzaSyCHBo_6-GZi4M7p77-Tk8W32i24KuD-tqg",
   authDomain: "bodaboda-9a325.firebaseapp.com",
@@ -12,104 +12,72 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
-
-// ═══════════════════════════════════════════
-// CLOUDINARY
-// ═══════════════════════════════════════════
 const CLD_CLOUD = 'dvdshonhc';
 const CLD_PRESET = 'mistream_uploads';
+const VAPID_KEY = '';
 
-async function uploadToCloudinary(file, folder) {
-  const fd = new FormData();
-  fd.append('file', file);
-  fd.append('upload_preset', CLD_PRESET);
-  fd.append('folder', `mistream/${folder}`);
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLD_CLOUD}/auto/upload`, { method: 'POST', body: fd });
-  const data = await res.json();
-  if (data.error) throw new Error(data.error.message);
-  return { url: data.secure_url, type: file.type.startsWith('video/') ? 'video' : 'image' };
-}
-
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════
 // CONSTANTS
-// ═══════════════════════════════════════════
-const NICHES = ['comedy','trading','music','fashion','football','fitness','travel','gaming','food','art','dance','business'];
-const NICHE_ICONS = { comedy:'fa-masks-theater', trading:'fa-chart-line', music:'fa-music', fashion:'fa-shirt', football:'fa-futbol', fitness:'fa-dumbbell', travel:'fa-plane', gaming:'fa-gamepad', food:'fa-utensils', art:'fa-palette', dance:'fa-person-dancing', business:'fa-briefcase' };
-const NICHE_EMOJIS = { comedy:'🎭', trading:'📈', music:'🎵', fashion:'👗', football:'⚽', fitness:'💪', travel:'✈️', gaming:'🎮', food:'🍽️', art:'🎨', dance:'💃', business:'💼' };
-const BG_CLASSES = ['bg1','bg2','bg3','bg4'];
+// ═══════════════════════════════════
 const LEVELS = [
-  { name:'Rookie', min:0, max:100 },
-  { name:'Pro', min:100, max:300 },
-  { name:'Expert', min:300, max:700 },
-  { name:'Elite', min:700, max:1500 },
-  { name:'Master', min:1500, max:3000 },
-  { name:'Ultra', min:3000, max:Infinity }
+  {name:'Rookie',min:0,max:100},
+  {name:'Pro',min:100,max:300},
+  {name:'Expert',min:300,max:700},
+  {name:'Elite',min:700,max:1500},
+  {name:'Master',min:1500,max:3000},
+  {name:'Ultra',min:3000,max:Infinity}
+];
+const BADGE_DEFS = {
+  unbeaten:{label:'UNBEATEN',cls:'badge-unbeaten',icon:'fa-shield',desc:'Won 3+ challenges without a loss'},
+  defender:{label:'DEFENDER',cls:'badge-defender',icon:'fa-shield-halved',desc:'Active and won last challenge'},
+  challenger:{label:'CHALLENGER',cls:'badge-challenger',icon:'fa-sword',desc:'Issued 3+ challenges this week'},
+  veteran:{label:'VETERAN',cls:'badge-veteran',icon:'fa-medal',desc:'10+ challenges completed'},
+  rising:{label:'RISING',cls:'badge-rising',icon:'fa-arrow-trend-up',desc:'Won last 2 challenges'},
+  fallen:{label:'FALLEN',cls:'badge-fallen',icon:'fa-arrow-trend-down',desc:'Lost last 3 challenges'}
+};
+
+// ═══════════════════════════════════
+// STATE
+// ═══════════════════════════════════
+let CU = null, CUD = null;
+let curScr = 'feed', prevScr = null;
+let chalTab = 'battles';
+let isMuted = true, curVideo = null, feedObserver = null;
+let feedUnsub = null, chalUnsub = null, notifUnsub = null, comUnsub = null;
+let comTarget = null;
+let giftTarget = null, giftAmt = 0;
+let c1PostTarget = null, c1SelPost = null, c1MediaFile = null;
+let ccMediaFile = null, postMediaFile = null, joinMediaFile = null;
+let joinChalTarget = null, joinSelPost = null;
+let respondChalData = null;
+let progInterval = null;
+let tipIndex = 0;
+const TIPS = [
+  {id:'scroll',title:'Scroll to discover',body:'Swipe up to see more comedy posts from creators around you.',anchor:'tk-feed',side:'bottom',x:'50%',y:'55%'},
+  {id:'sound',title:'Toggle sound',body:'Tap the speaker icon to unmute videos.',anchor:'tk-mute',side:'left',x:'85%',y:'35%'},
+  {id:'gift',title:'Gift creators',body:'Tap the coin icon to show a creator you\'d pay them. Every tap is tracked — real Mobile Money gifting comes in V1.',anchor:'gift-act',side:'left',x:'85%',y:'55%'},
+  {id:'challenge',title:'Challenge or vote',body:'Tap the shield icon to challenge a creator or vote in an active battle.',anchor:'chal-act',side:'left',x:'85%',y:'70%'},
+  {id:'battles',title:'See all battles',body:'Tap Battles below to watch ongoing 1v1 competitions and vote.',anchor:'bn-challenges',side:'top',x:'28%',y:'88%'}
 ];
 
-function getLevel(user) {
-  const score = (user.postCount||0)*10 + (user.challengeWins||0)*50 + (user.giftClicksReceived||0)*3 + (user.totalVotesReceived||0)*2;
-  const level = LEVELS.slice().reverse().find(l => score >= l.min) || LEVELS[0];
-  const next = LEVELS[LEVELS.indexOf(level)+1];
-  const pct = next ? Math.min(100, ((score - level.min)/(next.min - level.min))*100) : 100;
-  return { ...level, score, next, pct };
-}
-
-// ═══════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════
-let CU = null; // current user (firebase auth)
-let CUD = null; // current user data (firestore)
-let currentScreen = 'feed';
-let prevScreen = null;
-let feedNiche = 'all';
-let chalTab = '1v1';
-let isMuted = true;
-let currentVideo = null;
-let feedObserver = null;
-let feedUnsub = null;
-let chalUnsub = null;
-let notifUnsub = null;
-let commentsUnsub = null;
-let currentCommentTarget = null; // {collection, docId}
-let giftTarget = null;
-let selectedNiche = '';
-let regPhotoFile = null;
-let postMediaFile = null;
-let c1v1MediaFile = null;
-let ccMediaFile = null;
-let joinMediaFile = null;
-let selectedExistingPost = null;
-let selectedJoinPost = null;
-let chalTarget = null; // {uid, username, photoURL, displayName}
-let joinChalTarget = null; // challenge doc
-let progressInterval = null;
-
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════
 // INIT
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════
 window.addEventListener('load', () => {
+  registerSW();
   setTimeout(() => {
     document.getElementById('splash').classList.add('hidden');
     auth.onAuthStateChanged(async user => {
       if (user) {
         const snap = await db.collection('users').doc(user.uid).get();
-        if (snap.exists) {
-          CU = user;
-          CUD = snap.data();
-          initApp();
-        } else {
-          showAuthScreen();
-          sv('v-register');
-        }
-      } else {
-        showAuthScreen();
-        sv('v-login');
-      }
+        if (snap.exists) { CU = user; CUD = snap.data(); initApp(); }
+        else { showAuth(); sv('v-register'); }
+      } else { showAuth(); sv('v-login'); }
     });
-  }, 2200);
+  }, 2400);
 });
 
-function showAuthScreen() {
+function showAuth() {
   document.getElementById('auth').classList.remove('hidden');
   document.getElementById('app').classList.add('hidden');
 }
@@ -117,94 +85,58 @@ function showAuthScreen() {
 function initApp() {
   document.getElementById('auth').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
-  // Update topbar avatar
-  //updateTopAvatar();
-  // Populate selects
-  populateSelects();
-  // Update identity cards
-  updateIdentityCards();
-  // Track session
+  //setTopAv();
+  setMyId();
   trackSession();
-  // Listen notifications
   listenNotifs();
-  // Show feed
-  showScreen('feed');
+  requestPushPermission();
+  showScr('feed');
+  setTimeout(() => startTips(), 3000);
 }
-//firebase.auth().signOut()
-function updateTopAvatar() {
+
+function setTopAv() {
   const av = document.getElementById('top-av');
-  if (CUD.photoURL) {
-    av.innerHTML = `<img src="${CUD.photoURL}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>`;
-  } else {
-    av.textContent = CUD.displayName.charAt(0).toUpperCase();
-  }
+  if (CUD.photoURL) av.innerHTML = `<img src="${CUD.photoURL}"/>`;
+  else av.textContent = (CUD.displayName||'?').charAt(0).toUpperCase();
 }
 
-function populateSelects() {
-  const postNiche = document.getElementById('post-niche');
-  const ccNiche = document.getElementById('cc-niche');
-  if (postNiche) postNiche.innerHTML = NICHES.map(n => `<option value="${n}" ${n===CUD.niche?'selected':''}>${cap(n)}</option>`).join('');
-  if (ccNiche) ccNiche.innerHTML = NICHES.map(n => `<option value="${n}" ${n===CUD.niche?'selected':''}>${cap(n)}</option>`).join('');
-}
-
-function updateIdentityCards() {
+function setMyId() {
   const lv = getLevel(CUD);
-  const identityHTML = `
-    <div class="mid-av">${CUD.photoURL ? `<img src="${CUD.photoURL}"/>` : CUD.displayName.charAt(0).toUpperCase()}</div>
-    <div class="mid-info">
-      <div class="nm">${esc(CUD.displayName)}</div>
-      <div class="un">${esc(CUD.username)}</div>
-      <div class="lv">${lv.name}</div>
-    </div>`;
-  ['my-identity','post-identity'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = identityHTML;
-  });
+  const html = `<div class="my-id-av">${CUD.photoURL?`<img src="${CUD.photoURL}"/>`:(CUD.displayName||'?').charAt(0).toUpperCase()}</div><div class="my-id-info"><div class="nm">${esc(CUD.displayName)}</div><div class="un">${esc(CUD.username||'')}</div><div class="lv">${lv.name} · Comedy</div></div>`;
+  ['my-id','my-id-2'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = html; });
 }
 
-function trackSession() {
-  db.collection('users').doc(CU.uid).update({
-    lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
-    sessionCount: firebase.firestore.FieldValue.increment(1)
-  }).catch(() => {});
+async function trackSession() {
+  await db.collection('users').doc(CU.uid).update({
+    lastSeen: ts(), sessionCount: firebase.firestore.FieldValue.increment(1)
+  }).catch(()=>{});
 }
 
-// ═══════════════════════════════════════════
-// AUTH VIEWS
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════
+// AUTH
+// ═══════════════════════════════════
 function sv(id) {
   document.querySelectorAll('.auth-view').forEach(v => v.classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
 }
 
-function pickNiche(el) {
-  document.querySelectorAll('.no').forEach(o => o.classList.remove('sel'));
-  el.classList.add('sel');
-  selectedNiche = el.dataset.n;
-  updatePreview();
-}
-
-function updatePreview() {
-  const name = document.getElementById('r-name').value.trim().toLowerCase().replace(/\s+/g,'');
-  const prev = document.getElementById('upreview');
-  const upn = document.getElementById('upn');
-  if (name && selectedNiche) {
-    prev.classList.remove('hidden');
-    upn.textContent = `${name}@${selectedNiche}`;
-  } else {
-    prev.classList.add('hidden');
-  }
-}
-
+let regPhoto = null;
 function previewRegPhoto(input) {
-  const file = input.files[0];
-  if (!file) return;
-  regPhotoFile = file;
+  const file = input.files[0]; if (!file) return;
+  regPhoto = file;
   const reader = new FileReader();
   reader.onload = e => {
-    document.getElementById('reg-photo-circle').innerHTML = `<img src="${e.target.result}"/>`;
+    const el = document.getElementById('reg-photo-prev');
+    el.innerHTML = `<img src="${e.target.result}"/>`;
   };
   reader.readAsDataURL(file);
+}
+
+function updateUsernamePreview() {
+  const name = document.getElementById('r-name').value.trim().toLowerCase().replace(/\s+/g,'');
+  const prev = document.getElementById('upreview');
+  document.getElementById('upn').textContent = name ? `${name}@comedy` : 'name@comedy';
+  prev.classList.toggle('hidden', !name);
 }
 
 async function doRegister() {
@@ -214,36 +146,28 @@ async function doRegister() {
   const err = document.getElementById('r-err');
   err.classList.add('hidden');
   if (!name) { showErr(err,'Enter your name.'); return; }
-  if (!selectedNiche) { showErr(err,'Pick your niche.'); return; }
   if (!email) { showErr(err,'Enter your email.'); return; }
-  if (pass.length < 6) { showErr(err,'Password needs at least 6 characters.'); return; }
+  if (pass.length < 6) { showErr(err,'Password needs 6+ characters.'); return; }
   const btn = document.getElementById('reg-btn');
-  btn.innerHTML = '<div class="spin" style="width:18px;height:18px;margin:0 auto;"></div>';
-  btn.disabled = true;
+  setBtnLoad(btn, true);
   try {
-    const username = name.toLowerCase().replace(/\s+/g,'') + '@' + selectedNiche;
+    const username = name.toLowerCase().replace(/\s+/g,'') + '@comedy';
     const cred = await auth.createUserWithEmailAndPassword(email, pass);
     let photoURL = null;
-    if (regPhotoFile) {
+    if (regPhoto) {
       showToast('Uploading photo...');
-      const res = await uploadToCloudinary(regPhotoFile, `avatars/${cred.user.uid}`);
+      const res = await uploadCLD(regPhoto, `avatars/${cred.user.uid}`);
       photoURL = res.url;
     }
     await db.collection('users').doc(cred.user.uid).set({
-      uid: cred.user.uid, displayName: name, username,
-      niche: selectedNiche, email, photoURL, bio: '',
-      giftClicksReceived: 0, challengeRequestsReceived: 0,
-      challengeWins: 0, totalVotesReceived: 0,
-      followers: 0, following: 0, postCount: 0, sessionCount: 0,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      uid: cred.user.uid, displayName: name, username, niche: 'comedy',
+      email, photoURL, bio: '', giftClicksReceived: 0,
+      challengeWins: 0, challengeLosses: 0, challengeCount: 0,
+      totalVotesReceived: 0, followers: 0, following: 0,
+      postCount: 0, sessionCount: 0, badges: [],
+      createdAt: ts()
     });
-    
-    showScreen('feed')
-  } catch(e) {
-    showErr(err, friendlyErr(e.code));
-    btn.innerHTML = '<span>Claim My Identity</span><i class="fa-solid fa-arrow-right"></i>';
-    btn.disabled = false;
-  }
+  } catch(e) { showErr(err, friendlyErr(e.code)); setBtnLoad(btn, false, '<span>Claim My Identity</span><i class="fa-solid fa-arrow-right"></i>'); }
 }
 
 async function doLogin() {
@@ -252,1527 +176,1335 @@ async function doLogin() {
   const err = document.getElementById('l-err');
   err.classList.add('hidden');
   if (!email || !pass) { showErr(err,'Fill in all fields.'); return; }
-  try {
-    await auth.signInWithEmailAndPassword(email, pass);
-    
-    showScreen('feed')
-  } catch(e) {
-    showErr(err, friendlyErr(e.code));
-  }
+  const btn = document.getElementById('l-btn');
+  setBtnLoad(btn, true);
+  try { await auth.signInWithEmailAndPassword(email, pass); }
+  catch(e) { showErr(err, friendlyErr(e.code)); setBtnLoad(btn, false, '<span>Sign In</span><i class="fa-solid fa-arrow-right"></i>'); }
 }
 
 function showErr(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
 function friendlyErr(code) {
-  const m = { 'auth/email-already-in-use':'Email already registered.','auth/invalid-email':'Invalid email.','auth/wrong-password':'Wrong password.','auth/user-not-found':'No account with that email.','auth/weak-password':'Password too short.','auth/too-many-requests':'Too many attempts. Try later.' };
+  const m = {'auth/email-already-in-use':'Email already registered.','auth/invalid-email':'Invalid email.','auth/wrong-password':'Wrong password.','auth/user-not-found':'No account found.','auth/weak-password':'Password too short.','auth/too-many-requests':'Too many attempts. Try later.'};
   return m[code] || 'Something went wrong.';
 }
 
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════
 // NAVIGATION
-// ═══════════════════════════════════════════
-function showScreen(name) {
-  prevScreen = currentScreen;
-  currentScreen = name;
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+// ═══════════════════════════════════
+function showScr(name) {
+  prevScr = curScr; curScr = name;
+  document.querySelectorAll('.scr').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.bn').forEach(b => b.classList.remove('active'));
   const scr = document.getElementById(`scr-${name}`);
   if (scr) scr.classList.add('active');
   const bn = document.getElementById(`bn-${name}`);
   if (bn) bn.classList.add('active');
-  // Screen specific init
   if (name === 'feed') initFeed();
   if (name === 'challenges') initChallenges();
   if (name === 'profile') initProfile(CU.uid, true);
   if (name === 'notifications') initNotifs();
-  if (name === 'post') { updateIdentityCards(); populateSelects(); }
+  if (name === 'post') setMyId();
 }
 
 function goBack() {
-  if (prevScreen) showScreen(prevScreen);
-  else showScreen('feed');
+  if (prevScr) showScr(prevScr);
+  else showScr('feed');
 }
 
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════
+// CLOUDINARY + THUMBNAIL
+// ═══════════════════════════════════
+async function uploadCLD(file, folder) {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('upload_preset', CLD_PRESET);
+  fd.append('folder', `mistream/${folder}`);
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLD_CLOUD}/auto/upload`, {method:'POST',body:fd});
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return {url: data.secure_url, type: file.type.startsWith('video/') ? 'video' : 'image'};
+}
+
+async function genThumb(videoFile) {
+  return new Promise(resolve => {
+    const vid = document.createElement('video');
+    vid.preload = 'metadata'; vid.muted = true; vid.playsInline = true;
+    const url = URL.createObjectURL(videoFile);
+    vid.src = url;
+    vid.addEventListener('loadeddata', () => { vid.currentTime = 1; });
+    vid.addEventListener('seeked', () => {
+      const c = document.createElement('canvas');
+      c.width = vid.videoWidth || 480; c.height = vid.videoHeight || 854;
+      c.getContext('2d').drawImage(vid, 0, 0, c.width, c.height);
+      c.toBlob(blob => { URL.revokeObjectURL(url); resolve(blob); }, 'image/jpeg', 0.8);
+    });
+    vid.addEventListener('error', () => { URL.revokeObjectURL(url); resolve(null); });
+    vid.load();
+  });
+}
+
+async function uploadWithThumb(file, folder) {
+  const res = await uploadCLD(file, folder);
+  let thumbURL = null;
+  if (res.type === 'video') {
+    const blob = await genThumb(file);
+    if (blob) {
+      const tf = new File([blob], 'thumb.jpg', {type:'image/jpeg'});
+      const tr = await uploadCLD(tf, `thumbs/${CU.uid}`);
+      thumbURL = tr.url;
+    }
+  }
+  return {...res, thumbURL};
+}
+
+// ═══════════════════════════════════
+// LEVELS & BADGES
+// ═══════════════════════════════════
+function getLevel(u) {
+  const score = (u.postCount||0)*10 + (u.challengeWins||0)*50 + (u.giftClicksReceived||0)*3 + (u.totalVotesReceived||0)*2;
+  const lvl = LEVELS.slice().reverse().find(l => score >= l.min) || LEVELS[0];
+  const next = LEVELS[LEVELS.indexOf(lvl)+1];
+  const pct = next ? Math.min(100,((score-lvl.min)/(next.min-lvl.min))*100) : 100;
+  return {...lvl, score, next, pct};
+}
+
+function computeBadges(u) {
+  const badges = [];
+  const w = u.challengeWins||0, l = u.challengeLosses||0, total = (u.challengeCount||0);
+  if (w >= 3 && l === 0) badges.push('unbeaten');
+  if (w >= 1 && total >= 1) badges.push('defender');
+  if (total >= 10) badges.push('veteran');
+  if (w >= 2 && l === 0) badges.push('rising');
+  if (l >= 3) badges.push('fallen');
+  return badges;
+}
+
+function renderBadges(badges) {
+  return (badges||[]).map(b => {
+    const def = BADGE_DEFS[b];
+    if (!def) return '';
+    return `<span class="badge-pill ${def.cls}"><i class="fa-solid ${def.icon}"></i>${def.label}</span>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════
 // FEED
-// ═══════════════════════════════════════════
-function setFeedNiche(el) {
-  document.querySelectorAll('.nb').forEach(n => n.classList.remove('active'));
-  el.classList.add('active');
-  feedNiche = el.dataset.n;
-  initFeed();
-}
-
+// ═══════════════════════════════════
 function initFeed() {
   const feed = document.getElementById('tk-feed');
-  feed.innerHTML = `<div class="tk-post"><div class="feed-empty"><div class="spin" style="border-color:rgba(255,255,255,.2);border-top-color:var(--or);"></div><p>Loading...</p></div></div>`;
+  feed.innerHTML = `<div class="tk-post"><div style="height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;color:rgba(255,255,255,.4);"><div class="spin"></div><p style="font-family:Space Mono,monospace;font-size:11px;letter-spacing:1px;">Loading...</p></div></div>`;
   if (feedUnsub) feedUnsub();
   if (feedObserver) feedObserver.disconnect();
-  let q = db.collection('posts').orderBy('createdAt','desc').limit(20);
-  if (feedNiche !== 'all') q = q.where('niche','==',feedNiche);
-  feedUnsub = q.onSnapshot(snap => {
-    if (snap.empty) {
-      feed.innerHTML = `<div class="tk-post"><div class="feed-empty"><i class="fa-solid fa-wind"></i><h3>Nothing here yet</h3><p>Be the first to post in this niche.</p><button class="btn-or" onclick="showScreen('post')"><i class="fa-solid fa-plus"></i> Create First Post</button></div></div>`;
-      return;
-    }
-    feed.innerHTML = '';
-    snap.forEach((doc, i) => feed.appendChild(buildFeedPost(doc.id, doc.data(), i)));
-    setupObserver();
-  }, () => {
-    feed.innerHTML = `<div class="tk-post"><div class="feed-empty"><i class="fa-solid fa-wifi"></i><h3>Connection issue</h3><p>Check your internet and try again.</p></div></div>`;
-  });
-  
-  // Show mute hint once
-if (!localStorage.getItem('ms_mute_hint')) {
-  setTimeout(() => {
-    showToast('🔊 Tap the speaker icon for sound');
-    localStorage.setItem('ms_mute_hint', '1');
-  }, 2500);
-}
+  loadPersonalizedFeed();
 }
 
-function buildFeedPost(postId, d, idx) {
+async function loadPersonalizedFeed() {
+  const feed = document.getElementById('tk-feed');
+  // Get followed users
+  let followedIds = [];
+  try {
+    const fSnap = await db.collection('follows').where('followerId','==',CU.uid).limit(30).get();
+    followedIds = fSnap.docs.map(d => d.data().followingId);
+  } catch(e) {}
+  // Get posts — mix of followed + recent + challenges
+  const allPosts = [];
+  try {
+    // Followed posts
+    if (followedIds.length > 0) {
+      const fPosts = await db.collection('posts').where('authorId','in',followedIds.slice(0,10)).orderBy('createdAt','desc').limit(10).get();
+      fPosts.forEach(d => allPosts.push({...d.data(), id:d.id, weight: 3}));
+    }
+    // Recent posts
+    const rPosts = await db.collection('posts').orderBy('createdAt','desc').limit(20).get();
+    rPosts.forEach(d => { if (!allPosts.find(p=>p.id===d.id)) allPosts.push({...d.data(), id:d.id, weight:1}); });
+  } catch(e) {
+    const rPosts = await db.collection('posts').orderBy('createdAt','desc').limit(20).get();
+    rPosts.forEach(d => allPosts.push({...d.data(), id:d.id, weight:1}));
+  }
+  // Weighted shuffle
+  const shuffled = weightedShuffle(allPosts);
+  // Get active challenges for inline cards
+  let activeChallenges = [];
+  try {
+    const cSnap = await db.collection('challenges').where('type','==','1v1').where('status','==','active').orderBy('createdAt','desc').limit(5).get();
+    cSnap.forEach(d => activeChallenges.push({...d.data(), id:d.id}));
+  } catch(e) {}
+  feed.innerHTML = '';
+  let chalIdx = 0;
+  shuffled.forEach((post, i) => {
+    feed.appendChild(buildTkPostSync(post.id, post, i));
+    // Insert challenge card every 5 posts
+    if ((i+1) % 5 === 0 && chalIdx < activeChallenges.length) {
+      feed.appendChild(buildFeedChalCard(activeChallenges[chalIdx].id, activeChallenges[chalIdx]));
+      chalIdx++;
+    }
+  });
+  if (feed.children.length === 0) {
+    feed.innerHTML = `<div class="tk-post"><div style="height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:40px;text-align:center;"><i class="fa-solid fa-wind" style="font-size:44px;color:rgba(255,255,255,.2);"></i><h3 style="color:#fff;font-size:17px;">No posts yet</h3><p style="color:rgba(255,255,255,.4);font-size:13px;line-height:1.6;">Be the first to post and start the comedy battle.</p><button class="btn-or" onclick="showScr('post')"><i class="fa-solid fa-plus"></i> Create First Post</button></div></div>`;
+  }
+  setupObserver();
+  // Tag first tip anchor elements
+  setTimeout(() => { document.querySelector('.tk-mute')?.setAttribute('id','tk-mute'); }, 500);
+}
+
+function weightedShuffle(arr) {
+  const pool = [];
+  arr.forEach(item => { for (let i=0;i<(item.weight||1);i++) pool.push(item); });
+  const seen = new Set(), result = [];
+  for (let i=pool.length-1;i>=0;i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [pool[i],pool[j]] = [pool[j],pool[i]];
+    if (!seen.has(pool[i].id)) { seen.add(pool[i].id); result.push(pool[i]); }
+  }
+  return result;
+}
+
+async function buildTkPost(postId, d, idx) {
   const isOwn = d.authorId === CU.uid;
   const init = (d.authorName||'?').charAt(0).toUpperCase();
-  const niche = d.niche || d.authorNiche || 'comedy';
-  const icon = NICHE_ICONS[niche] || 'fa-star';
-  const emoji = NICHE_EMOJIS[niche] || '🎬';
-  const caption = (d.caption||'').replace(/#(\w+)/g,'<span class="ht">#$1</span>');
   const div = document.createElement('div');
   div.className = 'tk-post';
   div.dataset.postId = postId;
   // Media
+  const bgs = ['linear-gradient(160deg,#0d0a04,#2a1508,#060608)','linear-gradient(160deg,#050a10,#091525,#060608)','linear-gradient(160deg,#0d0508,#1e0d14,#060608)','linear-gradient(160deg,#080d05,#141f08,#060608)'];
   let mediaHTML = '';
   if (d.mediaURL) {
     if (d.mediaType === 'video') {
-      mediaHTML = `<video class="tk-video" src="${d.mediaURL}" loop playsinline muted preload="metadata" onclick="tapVideo(this,event)"></video>`;
+      mediaHTML = `<video class="tk-video" src="${d.mediaURL}" ${d.thumbURL?`poster="${d.thumbURL}"`:''}  loop playsinline muted preload="metadata" onclick="tapVid(this,event)"></video>`;
     } else {
       mediaHTML = `<img class="tk-img" src="${d.mediaURL}" loading="lazy"/>`;
     }
   } else {
-    const bgColors = ['linear-gradient(160deg,#0d0a04,#2a1508,#060608)','linear-gradient(160deg,#050a10,#091525,#060608)','linear-gradient(160deg,#0d0508,#1e0d14,#060608)','linear-gradient(160deg,#080d05,#141f08,#060608)'];
-    mediaHTML = `<div class="tk-nobg" style="background:${bgColors[idx%4]}"><span class="em">${emoji}</span></div>`;
+    mediaHTML = `<div class="tk-nobg" style="background:${bgs[idx%4]}"><span style="font-size:90px;filter:drop-shadow(0 0 30px rgba(255,180,50,.3));">🎭</span></div>`;
   }
+  // Check post challenges
+  let chalCount = 0, hasLive = false;
+  try {
+    const pcSnap = await db.collection('challenges').where('type','==','1v1').where('challengerPostId','==',postId).get();
+    const pcSnap2 = await db.collection('challenges').where('type','==','1v1').where('challengeePostId','==',postId).get();
+    chalCount = pcSnap.size + pcSnap2.size;
+    [...pcSnap.docs,...pcSnap2.docs].forEach(doc => {
+      const dd = doc.data();
+      if (dd.status === 'active' && (!dd.expiresAt || dd.expiresAt.toDate() > new Date())) hasLive = true;
+    });
+  } catch(e) {}
+  // Dynamic state
+  let stateHTML = '';
+  if (hasLive && chalCount > 0) {
+    stateHTML = `<div class="live-capsule"><div class="live-dot"></div><span class="live-text">LIVE VOTING · ${chalCount} CHALLENGE${chalCount>1?'S':''}</span></div>`;
+  } else if (chalCount > 0) {
+    stateHTML = `<div class="chal-capsule"><i class="fa-solid fa-shield-halved" style="font-size:9px;color:var(--go);"></i><span class="chal-capsule-txt">IN ${chalCount} CHALLENGE${chalCount>1?'S':''}</span></div>`;
+  }
+  // Shield icon state
+  const shieldLabel = chalCount > 0 ? 'Vote' : (isOwn ? 'Chals' : 'Challenge');
+  const shieldClass = chalCount > 0 ? 'chal-ai-active' : '';
+  const shieldOnClick = chalCount > 0
+    ? `openChalVoteModal('${postId}','${esc(d.authorName||'')}',this)`
+    : (isOwn ? `showToast('Go to Challenges tab to see yours.')` : `openC1v1Modal('${postId}','${d.authorId}','${esc(d.authorName||'')}','${d.authorUsername||''}','${d.thumbURL||d.mediaURL||''}')`);
   const avHTML = d.authorPhoto ? `<div class="tk-av" onclick="viewProfile('${d.authorId}')"><img src="${d.authorPhoto}"/></div>` : `<div class="tk-av" onclick="viewProfile('${d.authorId}')">${init}</div>`;
   div.innerHTML = `
     ${mediaHTML}
-    <div class="tk-grad-t"></div>
-    <div class="tk-grad-b"></div>
-    <div class="tk-mute" onclick="toggleMute()"><i class="fa-solid ${isMuted?'fa-volume-xmark':'fa-volume-high'}"></i></div>
-    <div class="tk-pause" id="pause-${postId}"><i class="fa-solid fa-pause"></i></div>
-    <div class="tk-meta" id="meta-${postId}">
+    <div class="tk-grad-t"></div><div class="tk-grad-b"></div>
+    <div class="tk-mute" id="tk-mute-${postId}" onclick="toggleMute()"><i class="fa-solid ${isMuted?'fa-volume-xmark':'fa-volume-high'}"></i></div>
+    <div class="tk-pause-ind" id="tk-pi-${postId}"><i class="fa-solid fa-pause"></i></div>
+    <div class="tk-meta" id="tk-meta-${postId}">
       ${avHTML}
       <div class="tk-meta-info">
-        <div class="tk-name">${esc(d.authorName||'Creator')}</div>
-        <div class="tk-urow">
+        <div class="tk-name" onclick="viewProfile('${d.authorId}')">${esc(d.authorName||'Creator')}</div>
+        <div class="tk-urow" onclick="viewProfile('${d.authorId}')">
           <span class="tk-user">${esc(d.authorUsername||'')}</span>
-          <div class="tk-lvl"><i class="fa-solid fa-arrow-up"></i><span id="lvl-${postId}">...</span></div>
+          <div class="tk-lvl" id="tk-lvl-${postId}"><i class="fa-solid fa-arrow-up"></i><span>...</span></div>
         </div>
       </div>
-      ${!isOwn?`<button class="tk-follow-btn" id="fbt-${postId}" onclick="toggleFollow('${d.authorId}','${postId}',this)">Follow</button>`:''}
+      ${!isOwn?`<button class="tk-follow-btn" id="tk-fb-${postId}" onclick="toggleFollow('${d.authorId}','${postId}',this)">Follow</button>`:''}
     </div>
     <div class="tk-acts">
-      <div class="tk-act" onclick="toggleLike('${postId}','${d.authorId}',this)" id="like-act-${postId}">
-        <div class="tk-ai" id="like-ai-${postId}"><i class="fa-regular fa-heart"></i></div>
-        <span class="tk-ac" id="like-cnt-${postId}">${fmtN(d.likes||0)}</span>
+      <div class="tk-act tk-search" onclick="openSearch()"><div class="tk-ai"><i class="fa-solid fa-magnifying-glass"></i></div><span class="tk-ac">Search</span></div>
+      <div class="tk-act" onclick="toggleLike('${postId}','${d.authorId}',this)" id="tk-like-${postId}">
+        <div class="tk-ai" id="tk-like-ai-${postId}"><i class="fa-regular fa-heart"></i></div>
+        <span class="tk-ac" id="tk-like-cnt-${postId}">${fmtN(d.likes||0)}</span>
       </div>
       <div class="tk-act" onclick="openComments('posts','${postId}')">
         <div class="tk-ai"><i class="fa-regular fa-comment-dots"></i></div>
-        <span class="tk-ac">${fmtN(d.comments||0)}</span>
+        <span class="tk-ac" id="tk-com-cnt-${postId}">${fmtN(d.comments||0)}</span>
       </div>
-      <div class="tk-act" onclick="openGiftModal('${postId}','${d.authorId}','${esc(d.authorUsername||d.authorName||'')}')">
+      <div class="tk-act" id="gift-act" onclick="openGiftModal('${postId}','${d.authorId}','${esc(d.authorUsername||d.authorName||'')}')">
         <div class="tk-ai gift-ai"><i class="fa-solid fa-coins"></i></div>
-        <span class="tk-ac" id="gift-cnt-${postId}">${fmtN(d.giftClicks||0)}</span>
+        <span class="tk-ac" id="tk-gift-cnt-${postId}">${fmtN(d.giftClicks||0)}</span>
       </div>
-      ${!isOwn?`<div class="tk-act" onclick="startC1v1('${d.authorId}','${esc(d.authorUsername||'')}','${esc(d.authorName||'')}','${d.authorPhoto||''}','${postId}')">
-        <div class="tk-ai chal-ai"><i class="fa-solid fa-shield-halved"></i></div>
-        <span class="tk-ac">1v1</span>
-      </div>`:''}
+      <div class="tk-act" id="chal-act" onclick="${shieldOnClick}">
+        <div class="tk-ai ${shieldClass}"><i class="fa-solid fa-shield-halved"></i></div>
+        <span class="tk-ac">${shieldLabel}</span>
+      </div>
     </div>
     <div class="tk-bottom">
-      <div class="tk-niche-tag"><i class="fa-solid ${icon}"></i><span>${niche.toUpperCase()}</span></div>
-      <div class="tk-caption">${caption}</div>
+      <div class="tk-state">${stateHTML}</div>
+      <div class="tk-caption">${(d.caption||'').replace(/#(\w+)/g,'<span class="ht">#$1</span>')}</div>
     </div>
-    <div class="tk-prog"><div class="tk-prog-fill" id="prog-${postId}"></div></div>`;
-  // Delayed meta reveal
-  setTimeout(() => { const m = document.getElementById(`meta-${postId}`); if(m) m.classList.add('show'); }, 1800);
-  // Load author level
-  db.collection('users').doc(d.authorId).get().then(snap => {
-    if (!snap.exists) return;
-    const lv = getLevel(snap.data());
-    const lvEl = document.getElementById(`lvl-${postId}`);
+    <div class="tk-prog"><div class="tk-prog-fill" id="tk-prog-${postId}"></div></div>`;
+  // Async: load author level
+  db.collection('users').doc(d.authorId).get().then(s => {
+    if (!s.exists) return;
+    const lv = getLevel(s.data());
+    const lvEl = div.querySelector(`#tk-lvl-${postId} span`);
     if (lvEl) lvEl.textContent = lv.name.toUpperCase();
   });
   // Check liked
-  checkLiked(postId);
+  db.collection('likes').doc(`${CU.uid}_${postId}`).get().then(s => {
+    if (s.exists) {
+      const ai = div.querySelector(`#tk-like-ai-${postId}`);
+      if (ai) { ai.innerHTML = '<i class="fa-solid fa-heart" style="color:#ff3060"></i>'; ai.classList.add('liked'); }
+    }
+  });
   // Check following
-  if (!isOwn) checkFollowing(d.authorId, `fbt-${postId}`);
+  if (!isOwn) {
+    db.collection('follows').doc(`${CU.uid}_${d.authorId}`).get().then(s => {
+      const btn = div.querySelector(`#tk-fb-${postId}`);
+      if (s.exists && btn) { btn.textContent='Following'; btn.classList.add('flw'); }
+    });
+  }
+  // Delayed meta reveal
+  setTimeout(() => { const m = div.querySelector(`#tk-meta-${postId}`); if(m) m.classList.add('show'); }, 1800);
   return div;
 }
 
+// Override buildTkPost since it became async — wrap in a sync shell
+function buildTkPostSync(postId, d, idx) {
+  // Return a placeholder div that gets populated
+  const div = document.createElement('div');
+  div.className = 'tk-post loading-post';
+  div.dataset.postId = postId;
+  div.innerHTML = `<div style="height:100%;display:flex;align-items:center;justify-content:center;"><div class="spin"></div></div>`;
+  buildTkPost(postId, d, idx).then(fullDiv => {
+    div.replaceWith(fullDiv);
+    setupObserver();
+  });
+  return div;
+}
+
+function buildFeedChalCard(chalId, d) {
+  const div = document.createElement('div');
+  div.className = 'feed-chal-card';
+  div.dataset.chalId = chalId;
+  const isExpired = d.expiresAt && d.expiresAt.toDate() < new Date();
+  const tot = (d.challengerVotes||0)+(d.challengeeVotes||0);
+  const crPct = tot ? Math.round((d.challengerVotes||0)/tot*100) : 50;
+  const cePct = 100-crPct;
+  function sideHTML(sideId, mediaURL, mediaType, thumbURL, name, username, votes, pct, onTap) {
+    let media = '';
+    if (mediaURL) {
+      if (mediaType==='video') {
+        media = `${thumbURL?`<img id="${sideId}-thumb" src="${thumbURL}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;z-index:2;"/>`:''}
+        <video id="${sideId}-fvid" src="${mediaURL}" playsinline muted loop preload="auto" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;"></video>
+        <div class="fcc-play-icon" id="${sideId}-fpi"><i class="fa-solid fa-play"></i></div>
+        <div class="fcc-chal-mute" onclick="toggleFccMute(event)"><i class="fa-solid ${isMuted?'fa-volume-xmark':'fa-volume-high'}"></i></div>`;
+      } else {
+        media = `<img src="${mediaURL}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;"/>`;
+      }
+    } else {
+      media = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:36px;color:rgba(255,255,255,.3);">⏳</div>`;
+    }
+    return `<div class="fcc-side" onclick="${onTap}"><div class="fcc-media-wrap">${media}<div class="fcc-ov"><div class="fcc-cr-name">${esc(name||'')}<span>${esc(username||'')}</span></div><div class="fcc-votes">${fmtN(votes||0)}</div><div class="fcc-pct">${pct}%</div><div class="fcc-bar"><div class="fcc-bar-fill" style="width:${pct}%"></div></div></div></div></div>`;
+  }
+  const crHTML = sideHTML('fcc-cr',d.challengerMediaURL,d.challengerMediaType,d.challengerThumbURL,d.challengerName,d.challengerUsername,d.challengerVotes,crPct,`playFccVid('fcc-cr','fcc-ce','${chalId}')`);
+  const ceHTML = sideHTML('fcc-ce',d.challengeeMediaURL,d.challengeeMediaType,d.challengeeThumbURL,d.challengeeName,d.challengeeUsername,d.challengeeVotes,cePct,`playFccVid('fcc-ce','fcc-cr','${chalId}')`);
+  div.innerHTML = `
+    <div class="fcc-glow"></div><div class="fcc-grid"></div>
+    <div class="fcc-label"><span class="fcc-dot"></span>LIVE BATTLE · COMEDY</div>
+    <div class="fcc-name">⚔️ <span>${esc(d.name||'Untitled')}</span></div>
+    ${d.expiresAt?`<div class="fcc-timer"><span class="timer-chip">${isExpired?'Ended':timeLeft(d.expiresAt.toDate())}</span></div>`:''}
+    <div class="fcc-posts" id="fcc-grid-${chalId}">
+      ${crHTML}<div class="fcc-vs">VS</div>${ceHTML}
+    </div>
+    ${!isExpired?`<div class="fcc-vote-row">
+      <button class="fcc-vbtn-a" id="fcc-va-${chalId}" onclick="voteFeed('${chalId}','challenger',this)">Vote ${esc(d.challengerName||'')}</button>
+      <button class="fcc-vbtn-b" id="fcc-vb-${chalId}" onclick="voteFeed('${chalId}','challengee',this)">Vote ${esc(d.challengeeName||'')}</button>
+    </div>`:`<div style="background:rgba(13,176,96,.08);border:1px solid rgba(13,176,96,.2);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:8px;margin-bottom:10px;"><i class="fa-solid fa-trophy" style="color:var(--gr);"></i><p style="font-size:12px;color:rgba(255,255,255,.7);">🏆 ${(d.challengerVotes||0)>=(d.challengeeVotes||0)?esc(d.challengerName):esc(d.challengeeName)} wins!</p></div>`}
+    <div class="fcc-com-bar">
+      <div class="fcc-com-input-row">
+        <div class="com-av-sm" style="border:1px solid rgba(255,255,255,.15);">${CUD.photoURL?`<img src="${CUD.photoURL}"/>`:(CUD.displayName||'?').charAt(0).toUpperCase()}</div>
+        <div class="fcc-com-wrap"><input type="text" id="fcc-ci-${chalId}" placeholder="Comment on this battle..." maxlength="200" oninput="document.getElementById('fcc-cs-${chalId}').disabled=!this.value.trim()"/><button id="fcc-cs-${chalId}" class="fcc-com-send" disabled onclick="submitFccComment('${chalId}','fcc-ci-${chalId}','fcc-cp-${chalId}')"><i class="fa-solid fa-paper-plane"></i></button></div>
+      </div>
+      <div class="fcc-com-preview" id="fcc-cp-${chalId}"></div>
+      <div class="fcc-see-all" onclick="viewBattle('${chalId}')">See full battle →</div>
+    </div>
+    <div class="fcc-skip" onclick="skipFeedCard(this)">↓ Continue scrolling</div>`;
+  // Check voted
+  db.collection('challengeVotes').doc(`${CU.uid}_${chalId}`).get().then(s => {
+    if (!s.exists) return;
+    const side = s.data().side;
+    const btnA = document.getElementById(`fcc-va-${chalId}`);
+    const btnB = document.getElementById(`fcc-vb-${chalId}`);
+    if (btnA) { btnA.disabled=true; if(side==='challenger'){btnA.classList.add('voted');btnA.textContent='✓ Your Vote';} }
+    if (btnB) { btnB.disabled=true; if(side==='challengee'){btnB.classList.add('voted');btnB.textContent='✓ Your Vote';} }
+  });
+  // Load preview comments
+  loadFccComments(chalId);
+  return div;
+}
+
+function skipFeedCard(el) {
+  const card = el.closest('.feed-chal-card');
+  card.scrollIntoView({block:'end',behavior:'smooth'});
+}
+
+let fccMuted = true;
+function playFccVid(playId, pauseId, chalId) {
+  const playVid = document.getElementById(playId+'-fvid');
+  const pauseVid = document.getElementById(pauseId+'-fvid');
+  const playThumb = document.getElementById(playId+'-thumb');
+  const playIcon = document.getElementById(playId+'-fpi');
+  if (!playVid) return;
+  if (playVid.style.display==='none'||!playVid.style.display) {
+    if (playThumb) playThumb.style.display='none';
+    playVid.style.display='block';
+    playVid.muted=fccMuted;
+    playVid.play().catch(()=>{});
+    if (playIcon) playIcon.classList.add('hidden-icon');
+    if (pauseVid&&!pauseVid.paused) pauseVid.pause();
+    const grid=document.getElementById(`fcc-grid-${chalId}`);
+    if (grid){grid.classList.remove('cr-big','ce-big');grid.classList.add(playId==='fcc-cr'?'cr-big':'ce-big');}
+  } else {
+    if (playVid.paused) { playVid.play().catch(()=>{}); if(playIcon)playIcon.classList.add('hidden-icon'); }
+    else { playVid.pause(); if(playIcon){playIcon.classList.remove('hidden-icon');} }
+    if (pauseVid&&!pauseVid.paused) pauseVid.pause();
+  }
+}
+function toggleFccMute(e) {
+  e.stopPropagation();
+  fccMuted=!fccMuted;
+  document.querySelectorAll('[id$="-fvid"]').forEach(v=>{if(v.tagName==='VIDEO')v.muted=fccMuted;});
+  document.querySelectorAll('.fcc-chal-mute i').forEach(i=>i.className=`fa-solid ${fccMuted?'fa-volume-xmark':'fa-volume-high'}`);
+}
+
+async function voteFeed(chalId, side, btn) {
+  const voteRef = db.collection('challengeVotes').doc(`${CU.uid}_${chalId}`);
+  const snap = await voteRef.get();
+  if (snap.exists) { showToast('Already voted!'); return; }
+  await voteRef.set({chalId,userId:CU.uid,side,createdAt:ts()});
+  const upd = side==='challenger'?{challengerVotes:firebase.firestore.FieldValue.increment(1),totalVotes:firebase.firestore.FieldValue.increment(1)}:{challengeeVotes:firebase.firestore.FieldValue.increment(1),totalVotes:firebase.firestore.FieldValue.increment(1)};
+  await db.collection('challenges').doc(chalId).update(upd);
+  btn.classList.add('voted'); btn.textContent='✓ Voted!'; btn.disabled=true;
+  document.querySelectorAll(`#fcc-va-${chalId},#fcc-vb-${chalId}`).forEach(b=>b.disabled=true);
+  showToast('✓ Vote counted!');
+}
+
+async function submitFccComment(chalId, inputId, previewId) {
+  const input=document.getElementById(inputId); if(!input)return;
+  const text=input.value.trim(); if(!text)return;
+  input.value=''; document.getElementById(`fcc-cs-${chalId}`).disabled=true;
+  await db.collection('challenges').doc(chalId).collection('comments').add({
+    authorId:CU.uid,authorName:CUD.displayName,authorUsername:CUD.username,
+    authorPhoto:CUD.photoURL||null,text,createdAt:ts()
+  });
+  await db.collection('challenges').doc(chalId).update({comments:firebase.firestore.FieldValue.increment(1)});
+  loadFccComments(chalId);
+}
+
+function loadFccComments(chalId) {
+  const preview=document.getElementById(`fcc-cp-${chalId}`); if(!preview)return;
+  db.collection('challenges').doc(chalId).collection('comments').orderBy('createdAt','desc').limit(2).onSnapshot(snap=>{
+    preview.innerHTML='';
+    snap.forEach(doc=>{
+      const d=doc.data();
+      const item=document.createElement('div');
+      item.className='bc-com-item';
+      const av=d.authorPhoto?`<div class="bc-com-item-av"><img src="${d.authorPhoto}"/></div>`:`<div class="bc-com-item-av">${(d.authorName||'?').charAt(0).toUpperCase()}</div>`;
+      item.innerHTML=`${av}<div><div class="bc-com-item-un">${esc(d.authorUsername||'')}</div><div class="bc-com-item-txt">${esc(d.text)}</div></div>`;
+      preview.appendChild(item);
+    });
+  });
+}
+
+// ── VIDEO OBSERVER ──
 function setupObserver() {
   if (feedObserver) feedObserver.disconnect();
   feedObserver = new IntersectionObserver(entries => {
     entries.forEach(e => {
-      const vid = e.target.querySelector('video');
+      const vid = e.target.querySelector('video.tk-video');
       if (!vid) return;
       if (e.isIntersecting) {
-        currentVideo = vid;
-        vid.muted = isMuted;
-        vid.play().catch(()=>{});
-        startProg(e.target, vid);
-      } else {
-        vid.pause();
-        vid.currentTime = 0;
-        stopProg();
-      }
+        curVideo=vid; vid.muted=isMuted; vid.play().catch(()=>{});
+        startProg(e.target,vid);
+      } else { vid.pause(); vid.currentTime=0; stopProg(); }
     });
-  }, { threshold: 0.7 });
-  document.querySelectorAll('.tk-post').forEach(p => feedObserver.observe(p));
+  },{threshold:0.7});
+  document.querySelectorAll('.tk-post').forEach(p=>feedObserver.observe(p));
 }
 
-function startProg(post, vid) {
+function startProg(post,vid){
   stopProg();
-  const fill = post.querySelector('.tk-prog-fill');
-  if (!fill) return;
-  progressInterval = setInterval(() => {
-    if (vid.duration) fill.style.width = (vid.currentTime/vid.duration*100) + '%';
-  }, 100);
+  const fill=post.querySelector('.tk-prog-fill'); if(!fill)return;
+  progInterval=setInterval(()=>{if(vid.duration)fill.style.width=(vid.currentTime/vid.duration*100)+'%';},100);
 }
-function stopProg() { if (progressInterval) clearInterval(progressInterval); }
+function stopProg(){if(progInterval)clearInterval(progInterval);}
 
-function tapVideo(vid, e) {
+function tapVid(vid,e){
   e.stopPropagation();
-  const postId = vid.closest('.tk-post').dataset.postId;
-  const indicator = document.getElementById(`pause-${postId}`);
-  if (vid.paused) {
-    vid.play();
-    if (indicator) { indicator.querySelector('i').className='fa-solid fa-play'; flash(indicator); }
-  } else {
-    vid.pause();
-    if (indicator) { indicator.querySelector('i').className='fa-solid fa-pause'; flash(indicator); }
-  }
+  const pid=vid.closest('.tk-post')?.dataset.postId;
+  const pi=document.getElementById(`tk-pi-${pid}`);
+  if(vid.paused){vid.play().catch(()=>{});if(pi){pi.querySelector('i').className='fa-solid fa-play';flashEl(pi);}}
+  else{vid.pause();if(pi){pi.querySelector('i').className='fa-solid fa-pause';flashEl(pi);}}
 }
-function flash(el) { el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),700); }
-
-function toggleMute() {
-  isMuted = !isMuted;
-  if (currentVideo) currentVideo.muted = isMuted;
-  document.querySelectorAll('.tk-mute i').forEach(i => i.className=`fa-solid ${isMuted?'fa-volume-xmark':'fa-volume-high'}`);
+function flashEl(el){el.classList.add('show');setTimeout(()=>el.classList.remove('show'),700);}
+function toggleMute(){
+  isMuted=!isMuted;
+  if(curVideo)curVideo.muted=isMuted;
+  document.querySelectorAll('[id^="tk-mute-"] i').forEach(i=>i.className=`fa-solid ${isMuted?'fa-volume-xmark':'fa-volume-high'}`);
 }
 
 // ── LIKE ──
 async function toggleLike(postId, authorId, btn) {
-  const lid = `${CU.uid}_${postId}`;
-  const likeRef = db.collection('likes').doc(lid);
-  const postRef = db.collection('posts').doc(postId);
-  const ai = document.getElementById(`like-ai-${postId}`);
-  const cnt = document.getElementById(`like-cnt-${postId}`);
-  const snap = await likeRef.get();
-  if (snap.exists) {
-    await likeRef.delete();
-    await postRef.update({ likes: firebase.firestore.FieldValue.increment(-1) });
-    if (ai) { ai.innerHTML='<i class="fa-regular fa-heart"></i>'; ai.classList.remove('liked'); }
-  } else {
-    await likeRef.set({ postId, userId: CU.uid, authorId, createdAt: ts() });
-    await postRef.update({ likes: firebase.firestore.FieldValue.increment(1) });
-    if (ai) { ai.innerHTML='<i class="fa-solid fa-heart" style="color:#ff3060"></i>'; ai.classList.add('liked'); ai.style.transform='scale(1.3)'; setTimeout(()=>ai.style.transform='',200); }
-    if (authorId !== CU.uid) addNotif(authorId,'like',`${CUD.username} liked your post.`,'posts',postId);
+  const lid=`${CU.uid}_${postId}`;
+  const ref=db.collection('likes').doc(lid);
+  const ai=document.getElementById(`tk-like-ai-${postId}`);
+  const cnt=document.getElementById(`tk-like-cnt-${postId}`);
+  const snap=await ref.get();
+  if(snap.exists){
+    await ref.delete();
+    await db.collection('posts').doc(postId).update({likes:firebase.firestore.FieldValue.increment(-1)});
+    if(ai){ai.innerHTML='<i class="fa-regular fa-heart"></i>';ai.classList.remove('liked');}
+  }else{
+    await ref.set({postId,userId:CU.uid,authorId,createdAt:ts()});
+    await db.collection('posts').doc(postId).update({likes:firebase.firestore.FieldValue.increment(1)});
+    if(ai){ai.innerHTML='<i class="fa-solid fa-heart" style="color:#ff3060"></i>';ai.classList.add('liked');ai.style.transform='scale(1.3)';setTimeout(()=>ai.style.transform='',200);}
+    if(authorId!==CU.uid)addNotif(authorId,'like',`${CUD.username} liked your post.`,'posts',postId);
   }
-  if (cnt) { const snap2 = await postRef.get(); if (snap2.exists) cnt.textContent = fmtN(snap2.data().likes||0); }
-}
-
-async function checkLiked(postId) {
-  const snap = await db.collection('likes').doc(`${CU.uid}_${postId}`).get();
-  if (snap.exists) {
-    const ai = document.getElementById(`like-ai-${postId}`);
-    if (ai) { ai.innerHTML='<i class="fa-solid fa-heart" style="color:#ff3060"></i>'; ai.classList.add('liked'); }
-  }
+  // Refresh count
+  const fresh=await db.collection('posts').doc(postId).get();
+  if(fresh.exists&&cnt)cnt.textContent=fmtN(fresh.data().likes||0);
 }
 
 // ── FOLLOW ──
-async function toggleFollow(uid, postId, btn) {
-  const fid = `${CU.uid}_${uid}`;
-  const ref = db.collection('follows').doc(fid);
-  const snap = await ref.get();
-  if (snap.exists) {
+async function toggleFollow(uid,postId,btn){
+  const fid=`${CU.uid}_${uid}`;
+  const ref=db.collection('follows').doc(fid);
+  const snap=await ref.get();
+  if(snap.exists){
     await ref.delete();
-    await db.collection('users').doc(uid).update({ followers: firebase.firestore.FieldValue.increment(-1) });
-    await db.collection('users').doc(CU.uid).update({ following: firebase.firestore.FieldValue.increment(-1) });
-    if (btn) { btn.textContent='Follow'; btn.classList.remove('flw'); }
-  } else {
-    await ref.set({ followerId: CU.uid, followingId: uid, createdAt: ts() });
-    await db.collection('users').doc(uid).update({ followers: firebase.firestore.FieldValue.increment(1) });
-    await db.collection('users').doc(CU.uid).update({ following: firebase.firestore.FieldValue.increment(1) });
-    if (btn) { btn.textContent='Following'; btn.classList.add('flw'); }
+    await db.collection('users').doc(uid).update({followers:firebase.firestore.FieldValue.increment(-1)});
+    await db.collection('users').doc(CU.uid).update({following:firebase.firestore.FieldValue.increment(-1)});
+    if(btn){btn.textContent='Follow';btn.classList.remove('flw');}
+  }else{
+    await ref.set({followerId:CU.uid,followingId:uid,createdAt:ts()});
+    await db.collection('users').doc(uid).update({followers:firebase.firestore.FieldValue.increment(1)});
+    await db.collection('users').doc(CU.uid).update({following:firebase.firestore.FieldValue.increment(1)});
+    if(btn){btn.textContent='Following';btn.classList.add('flw');}
     addNotif(uid,'follow',`${CUD.username} followed you.`,'','');
   }
 }
 
-async function checkFollowing(uid, btnId) {
-  const snap = await db.collection('follows').doc(`${CU.uid}_${uid}`).get();
-  const btn = document.getElementById(btnId);
-  if (snap.exists && btn) { btn.textContent='Following'; btn.classList.add('flw'); }
-}
-
-// ── VIEW PROFILE ──
-async function viewProfile(uid) {
-  prevScreen = currentScreen;
-  currentScreen = 'viewprofile';
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('scr-viewprofile').classList.add('active');
-  document.getElementById('viewprofile-content').innerHTML = '<div class="loading-state"><div class="spin dark"></div><span>Loading...</span></div>';
-  initProfile(uid, uid === CU.uid, 'viewprofile-content');
-}
-
-// ═══════════════════════════════════════════
-// POST CREATION
-// ═══════════════════════════════════════════
-function previewPostMedia(input) {
-  const file = input.files[0]; if (!file) return;
-  postMediaFile = file;
-  showMediaPreview(file, 'post-media-preview', 'media-drop');
-}
-function previewC1v1Media(input) {
-  const file = input.files[0]; if (!file) return;
-  c1v1MediaFile = file;
-  showMediaPreview(file, 'c1v1-media-preview', null);
-}
-function previewCCMedia(input) {
-  const file = input.files[0]; if (!file) return;
-  ccMediaFile = file;
-  showMediaPreview(file, 'cc-media-preview', null);
-}
-function previewJoinMedia(input) {
-  const file = input.files[0]; if (!file) return;
-  joinMediaFile = file;
-  showMediaPreview(file, 'join-media-preview', null);
-}
-
-function showMediaPreview(file, previewId, dropId) {
-  const prev = document.getElementById(previewId);
-  if (!prev) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const isVid = file.type.startsWith('video/');
-    prev.innerHTML = `<div class="media-preview-wrap">${isVid?`<video src="${e.target.result}" controls style="width:100%;max-height:240px;object-fit:cover;display:block;"></video>`:`<img src="${e.target.result}" style="width:100%;max-height:240px;object-fit:cover;display:block;"/>`}<button class="remove-media" onclick="removeMedia('${previewId}','${dropId}')"><i class="fa-solid fa-xmark"></i></button></div>`;
-    prev.classList.remove('hidden');
-    if (dropId) document.getElementById(dropId).classList.add('hidden');
-  };
-  reader.readAsDataURL(file);
-}
-
-function removeMedia(previewId, dropId) {
-  const prev = document.getElementById(previewId);
-  if (prev) { prev.classList.add('hidden'); prev.innerHTML=''; }
-  if (dropId) document.getElementById(dropId).classList.remove('hidden');
-  postMediaFile = null; c1v1MediaFile = null; ccMediaFile = null; joinMediaFile = null;
-}
-
-async function doPost() {
-  const caption = document.getElementById('post-caption').value.trim();
-  const niche = document.getElementById('post-niche').value;
-  const err = document.getElementById('post-err');
-  err.classList.add('hidden');
-  if (!caption && !postMediaFile) { showErr(err,'Write a caption or add media.'); return; }
-  const btn = document.querySelector('#scr-post .btn-or');
-  setBtnLoading(btn, true);
-  try {
-    let mediaURL = null, mediaType = null;
-    if (postMediaFile) {
-      showToast('Uploading...');
-      const res = await uploadToCloudinary(postMediaFile, `posts/${CU.uid}`);
-      mediaURL = res.url; mediaType = res.type;
-    }
-    const postRef = await db.collection('posts').add({
-      authorId: CU.uid, authorName: CUD.displayName,
-      authorUsername: CUD.username, authorNiche: CUD.niche,
-      authorPhoto: CUD.photoURL||null,
-      caption, niche, mediaURL, mediaType,
-      likes:0, comments:0, giftClicks:0,
-      createdAt: ts()
-    });
-    await db.collection('users').doc(CU.uid).update({ postCount: firebase.firestore.FieldValue.increment(1) });
-    CUD.postCount = (CUD.postCount||0)+1;
-    // Reset form
-    document.getElementById('post-caption').value = '';
-    document.getElementById('cap-cnt').textContent = '0/300';
-    removeMedia('post-media-preview','media-drop');
-    showToast('🔥 Post published!');
-    showScreen('feed');
-  } catch(e) { showErr(err, e.message); }
-  setBtnLoading(btn, false, '<span>Publish Post</span><i class="fa-solid fa-paper-plane"></i>');
-}
-
-// ═══════════════════════════════════════════
-// CHALLENGES
-// ═══════════════════════════════════════════
-function setChalTab(el) {
-  document.querySelectorAll('.ctab').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');
-  chalTab = el.dataset.t;
-  initChallenges();
-}
-
-function initChallenges() {
-  const list = document.getElementById('chal-list');
-  list.innerHTML = '<div class="loading-state"><div class="spin dark"></div><span>Loading challenges...</span></div>';
-  if (chalUnsub) chalUnsub();
-  let q;
-  if (chalTab === '1v1') {
-    q = db.collection('challenges').where('type','==','1v1').orderBy('createdAt','desc').limit(30);
-  } else if (chalTab === 'community') {
-    q = db.collection('challenges').where('type','==','community').orderBy('createdAt','desc').limit(30);
-  } else {
-    // Mine — challenges I created or am part of
-    q = db.collection('challenges').where('participants','array-contains',CU.uid).orderBy('createdAt','desc').limit(30);
-  }
-  chalUnsub = q.onSnapshot(snap => {
-    if (snap.empty) {
-      list.innerHTML = `<div class="chal-empty"><i class="fa-solid fa-shield-halved"></i><p>${chalTab==='1v1'?'No 1v1 battles yet. Challenge someone from the feed!':chalTab==='community'?'No community challenges yet. Create the first one!':'You haven\'t joined any challenges yet.'}</p><button class="btn-or" onclick="${chalTab==='community'?'showScreen(\'create-community-challenge\')':'showScreen(\'feed\')'}">${chalTab==='community'?'<i class="fa-solid fa-plus"></i> Create Challenge':'<i class="fa-solid fa-clapperboard"></i> Go To Feed'}</button></div>`;
-      return;
-    }
-    list.innerHTML = '';
-    snap.forEach(doc => list.appendChild(buildChalCard(doc.id, doc.data())));
-  }, err => {
-    list.innerHTML = `<div class="chal-empty"><i class="fa-solid fa-database"></i><p>Index building... Check Firebase console for a link and click it to create the index. Takes 2 minutes.</p></div>`;
-    console.error(err);
+// ─────────────────────────────────────────────
+// CHALLENGE VOTE MODAL (from post shield)
+// ─────────────────────────────────────────────
+async function openChalVoteModal(postId, authorName, btn) {
+  document.getElementById('chal-vote-modal').classList.remove('hidden');
+  document.getElementById('cvm-subtitle').textContent = `${authorName}'s post is in these active challenges. Tap to vote.`;
+  const list = document.getElementById('chal-vote-list');
+  list.innerHTML = '<div class="loading"><div class="spin dark"></div></div>';
+  // Fetch challenges this post is in
+  const snaps = await Promise.all([
+    db.collection('challenges').where('challengerPostId','==',postId).where('type','==','1v1').get(),
+    db.collection('challenges').where('challengeePostId','==',postId).where('type','==','1v1').get()
+  ]);
+  const chals = [];
+  [...snaps[0].docs,...snaps[1].docs].forEach(doc=>{
+    if(!chals.find(c=>c.id===doc.id))chals.push({id:doc.id,...doc.data()});
   });
-}
-
-function buildChalCard(id, d) {
-  const div = document.createElement('div');
-  div.className = 'cc';
-  const isExpired = d.expiresAt && d.expiresAt.toDate() < new Date();
-  const badgeClass = d.status==='pending' ? 'pending' : isExpired ? 'ended' : d.type==='1v1' ? 'live' : 'open';
-  const badgeText = d.status==='pending' ? '● Awaiting Accept' : isExpired ? 'Ended' : d.type==='1v1' ? '● Live' : '● Open';
-  let inner = `
-    <div class="cc-top">
-      <div class="cc-type"><i class="fa-solid fa-shield-halved"></i> ${d.type==='1v1'?'1V1 BATTLE':'COMMUNITY CHALLENGE'}</div>
-      <div class="cc-badge ${badgeClass}">${badgeText}</div>
-    </div>
-    <div class="cc-name">${esc(d.name||'Untitled Challenge')}</div>
-    <div class="cc-meta">
-      <span><i class="fa-solid fa-masks-theater"></i> ${esc(d.niche||'')}</span>
-      ${d.expiresAt?`<span><i class="fa-regular fa-clock"></i> ${isExpired?'Ended':timeLeft(d.expiresAt.toDate())}</span>`:''}
-      <span><i class="fa-solid fa-users"></i> ${d.entryCount||0} entries</span>
-      <span><i class="fa-regular fa-thumbs-up"></i> ${d.totalVotes||0} votes</span>
-    </div>`;
-  if (d.type==='1v1' && d.challengerUsername && d.challengeeUsername) {
-    inner += `<div class="cc-vs">
-      <div class="cc-vs-cr"><div class="nm">${esc(d.challengerName||'')}</div><div class="un">${esc(d.challengerUsername)}</div></div>
-      <div class="cc-vs-lbl">VS</div>
-      <div class="cc-vs-cr"><div class="nm">${esc(d.challengeeName||'')}</div><div class="un">${esc(d.challengeeUsername)}</div></div>
-    </div>`;
-  }
-  div.innerHTML = inner;
-  div.onclick = () => {
-    if (d.type==='1v1') viewC1v1(id, d);
-    else viewCommunity(id, d);
-  };
-  return div;
-}
-
-// ── 1V1 CHALLENGE CREATION ──
-function startC1v1(uid, username, displayName, photoURL, feedPostId) {
-  chalTarget = { uid, username, displayName, photoURL };
-  // Set to-card
-  const card = document.getElementById('chal-to-card');
-  card.innerHTML = `<div class="chal-to-av">${photoURL?`<img src="${photoURL}"/>`:(displayName||'?').charAt(0).toUpperCase()}</div><div><div class="lbl">CHALLENGING</div><div class="target-name">${esc(displayName)}</div><div class="target-un">${esc(username)}</div></div>`;
-  // Load my posts for picker
-  loadMyPostsForPicker('existing-posts-list', feedPostId);
-  prevScreen = currentScreen;
-  currentScreen = 'create1v1';
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('scr-create1v1').classList.add('active');
-}
-
-async function loadMyPostsForPicker(listId, preselect) {
-  const list = document.getElementById(listId);
-  list.innerHTML = '<div class="loading-state" style="padding:14px;"><div class="spin dark"></div></div>';
-  const snap = await db.collection('posts').where('authorId','==',CU.uid).orderBy('createdAt','desc').limit(12).get();
-  if (snap.empty) {
-    list.innerHTML = '<div style="font-size:12px;color:var(--mu);padding:10px 0;text-align:center;">No posts yet. Create a post first or use the New Post option above.</div>';
-    return;
-  }
-  list.innerHTML = '';
-  selectedExistingPost = null;
-  snap.forEach(doc => {
-    const d = doc.data();
-    const item = document.createElement('div');
-    item.className = 'ep-item' + (preselect===doc.id?' sel':'');
-    item.dataset.postId = doc.id;
-    if (preselect===doc.id) selectedExistingPost = { postId: doc.id, caption: d.caption, mediaURL: d.mediaURL, mediaType: d.mediaType };
-    const thumbHTML = d.mediaURL ? (d.mediaType==='video'?`<video src="${d.mediaURL}" style="width:100%;height:100%;object-fit:cover;"></video>`:`<img src="${d.mediaURL}" style="width:100%;height:100%;object-fit:cover;"/>`):`<span>${NICHE_EMOJIS[d.niche]||'🎬'}</span>`;
-    item.innerHTML = `<div class="ep-thumb">${thumbHTML}</div><div class="ep-info"><p>${esc((d.caption||'No caption').substring(0,50))}</p><small>${d.niche} · ${d.createdAt?timeAgo(d.createdAt.toDate()):'recently'}</small></div><i class="fa-${preselect===doc.id?'solid':'regular'} fa-circle-check ep-check"></i>`;
-    item.onclick = () => {
-      document.querySelectorAll(`#${listId} .ep-item`).forEach(i=>{i.classList.remove('sel');i.querySelector('.ep-check').className='fa-regular fa-circle-check ep-check';});
-      item.classList.add('sel');
-      item.querySelector('.ep-check').className = 'fa-solid fa-circle-check ep-check';
-      selectedExistingPost = { postId: doc.id, caption: d.caption, mediaURL: d.mediaURL, mediaType: d.mediaType };
-    };
-    list.appendChild(item);
-  });
-}
-
-function setPickerTab(el, tab) {
-  document.querySelectorAll('.picker-tab').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('existing-posts-list').classList.toggle('hidden', tab!=='existing');
-  document.getElementById('new-post-section').classList.toggle('hidden', tab!=='new');
-}
-
-async function submitC1v1() {
-  if (!chalTarget) return;
-  const name = document.getElementById('c1v1-name').value.trim();
-  const expiry = parseInt(document.getElementById('c1v1-expiry').value);
-  const err = document.getElementById('c1v1-err');
-  err.classList.add('hidden');
-  if (!name) { showErr(err,'Give the challenge a name.'); return; }
-  // Determine entry
-  let entryPost = selectedExistingPost;
-  const isNew = !document.getElementById('new-post-section').classList.contains('hidden');
-  if (isNew) {
-    const cap = document.getElementById('c1v1-caption').value.trim();
-    if (!cap && !c1v1MediaFile) { showErr(err,'Add a caption or media for your entry.'); return; }
-  }
-  const btn = document.querySelector('#scr-create1v1 .btn-or');
-  setBtnLoading(btn, true);
-  try {
-    let mediaURL = null, mediaType = null, postId = null;
-    if (isNew) {
-      showToast('Uploading entry...');
-      if (c1v1MediaFile) {
-        const res = await uploadToCloudinary(c1v1MediaFile, `posts/${CU.uid}`);
-        mediaURL = res.url; mediaType = res.type;
-      }
-      const cap = document.getElementById('c1v1-caption').value.trim();
-      const pRef = await db.collection('posts').add({
-        authorId: CU.uid, authorName: CUD.displayName,
-        authorUsername: CUD.username, authorNiche: CUD.niche,
-        authorPhoto: CUD.photoURL||null,
-        caption: cap, niche: CUD.niche, mediaURL, mediaType,
-        likes:0, comments:0, giftClicks:0, createdAt: ts()
-      });
-      await db.collection('users').doc(CU.uid).update({ postCount: firebase.firestore.FieldValue.increment(1) });
-      postId = pRef.id;
-      entryPost = { postId, caption: cap, mediaURL, mediaType };
-    } else {
-      if (!entryPost) { showErr(err,'Select one of your posts as your entry.'); setBtnLoading(btn,false,'<i class="fa-solid fa-shield-halved"></i> <span>Send Challenge</span>'); return; }
-      postId = entryPost.postId;
-    }
-    const expiresAt = new Date(Date.now() + expiry*24*60*60*1000);
-    const chalRef = await db.collection('challenges').add({
-      type: '1v1', name, niche: CUD.niche,
-      challengerId: CU.uid, challengerUsername: CUD.username, challengerName: CUD.displayName, challengerPhoto: CUD.photoURL||null,
-      challengerPostId: postId, challengerCaption: entryPost.caption||'', challengerMediaURL: entryPost.mediaURL||null, challengerMediaType: entryPost.mediaType||null,
-      challengerVotes: 0,
-      challengeeId: chalTarget.uid, challengeeUsername: chalTarget.username, challengeeName: chalTarget.displayName, challengeePhoto: chalTarget.photoURL||null,
-      challengeePostId: null, challengeeCaption: null, challengeeMediaURL: null, challengeeMediaType: null,
-      challengeeVotes: 0,
-      status: 'pending', expiresAt, entryCount: 1, totalVotes: 0,
-      participants: [CU.uid, chalTarget.uid],
-      createdAt: ts()
-    });
-    await db.collection('users').doc(chalTarget.uid).update({ challengeRequestsReceived: firebase.firestore.FieldValue.increment(1) });
-    addNotif(chalTarget.uid,'chal',`${CUD.username} challenged you to a 1v1! Check Challenges tab.`,'challenges',chalRef.id);
-    showToast('⚔️ Challenge sent!');
-    showScreen('challenges');
-  } catch(e) { showErr(err, e.message); }
-  setBtnLoading(btn,false,'<i class="fa-solid fa-shield-halved"></i> <span>Send Challenge</span>');
-}
-
-// ── VIEW 1V1 CHALLENGE ──
-function viewC1v1(id, d) {
-  prevScreen = currentScreen;
-  currentScreen = 'view1v1';
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('scr-view1v1').classList.add('active');
-  const content = document.getElementById('view1v1-content');
-  const isExpired = d.expiresAt && d.expiresAt.toDate() < new Date();
-  const iAmChallenger = d.challengerId === CU.uid;
-  const iAmChallengee = d.challengeeId === CU.uid;
-  const isPending = d.status === 'pending';
-  const totalVotes = (d.challengerVotes||0) + (d.challengeeVotes||0);
-  const crPct = totalVotes ? Math.round((d.challengerVotes||0)/totalVotes*100) : 50;
-  const cePct = 100 - crPct;
-
- const crMediaHTML = d.challengerMediaURL
-  ? (d.challengerMediaType === 'video'
-      ? `<div class="v1v1-media-wrap" id="cr-wrap">
-           <video id="cr-video" src="${d.challengerMediaURL}" playsinline muted preload="auto"
-             style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;"
-             onclick="toggleChalVideo('cr','ce')"
-             onended="switchChalVideo('ce')">
-           </video>
-           <div class="chal-mute-btn" id="cr-mute" onclick="toggleChalMute(event)">
-             <i class="fa-solid fa-volume-xmark"></i>
-           </div>
-           <div class="chal-play-indicator" id="cr-indicator">
-             <i class="fa-solid fa-play"></i>
-           </div>
-         </div>`
-      : `<div class="v1v1-media-wrap"><img src="${d.challengerMediaURL}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;"/></div>`)
-  : `<div class="v1v1-media-wrap" style="background:var(--deep);display:flex;align-items:center;justify-content:center;"><span style="font-size:40px;">${NICHE_EMOJIS[d.niche]||'🎬'}</span></div>`;
-
-const ceMediaHTML = d.challengeeMediaURL
-  ? (d.challengeeMediaType === 'video'
-      ? `<div class="v1v1-media-wrap" id="ce-wrap">
-           <video id="ce-video" src="${d.challengeeMediaURL}" playsinline muted preload="auto"
-             style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;"
-             onclick="toggleChalVideo('ce','cr')"
-             onended="switchChalVideo('cr')">
-           </video>
-           <div class="chal-mute-btn" id="ce-mute" onclick="toggleChalMute(event)">
-             <i class="fa-solid fa-volume-xmark"></i>
-           </div>
-           <div class="chal-play-indicator" id="ce-indicator">
-             <i class="fa-solid fa-pause"></i>
-           </div>
-         </div>`
-      : `<div class="v1v1-media-wrap"><img src="${d.challengeeMediaURL}" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0;"/></div>`)
-  : `<div class="v1v1-media-wrap" style="background:var(--deep);display:flex;align-items:center;justify-content:center;"><span style="font-size:28px;color:rgba(255,255,255,.3);">${isPending?'⏳ Waiting...':'No entry'}</span></div>`;
-
-  let actionHTML = '';
-  if (isPending && iAmChallengee) {
-    actionHTML = `<div class="v1v1-accept-row">
-      <button class="accept-btn" onclick="acceptC1v1('${id}')"><i class="fa-solid fa-check"></i> Accept Challenge</button>
-      <button class="decline-btn" onclick="declineC1v1('${id}')">Decline</button>
-    </div>`;
-  } else if (isPending && iAmChallenger) {
-    actionHTML = `<div class="v1v1-pending"><i class="fa-regular fa-clock"></i><p>Waiting for ${esc(d.challengeeName)} to accept your challenge. They've been notified.</p></div>`;
-  } else if (!isPending && !isExpired) {
-    actionHTML = `<div class="v1v1-vote-row">
-      <button class="vbtn-a" id="vbtn-cr" onclick="vote1v1('${id}','challenger',this)">Vote ${esc(d.challengerName)}</button>
-      <button class="vbtn-b" id="vbtn-ce" onclick="vote1v1('${id}','challengee',this)">Vote ${esc(d.challengeeName)}</button>
-    </div>`;
-  } else if (isExpired) {
-    const winner = d.challengerVotes >= d.challengeeVotes ? d.challengerName : d.challengeeName;
-    actionHTML = `<div class="v1v1-pending" style="background:rgba(13,176,96,.08);border-color:rgba(13,176,96,.2);"><i class="fa-solid fa-trophy" style="color:var(--gr);"></i><p style="color:rgba(255,255,255,.7);"><strong style="color:#fff;">🏆 ${esc(winner)} wins!</strong> Challenge ended.</p></div>`;
-  }
-
-  content.innerHTML = `
-    <div class="v1v1-hero">
-      <div class="v1v1-glow"></div>
-      <div class="v1v1-name">⚔️ <span>${esc(d.name)}</span></div>
-      ${d.expiresAt?`<div class="v1v1-timer"><span class="timer-chip">${isExpired?'Ended':timeLeft(d.expiresAt.toDate())}</span>${!isExpired?'remaining':''}</div>`:''}
-      <div class="v1v1-posts">
-        <div class="v1v1-side">
-          ${crMediaHTML}
-          <div class="v1v1-media-ov">
-            <div class="v1v1-creator">${esc(d.challengerName)}<span>${esc(d.challengerUsername)}</span></div>
-            <div class="v1v1-vote-count">${fmtN(d.challengerVotes||0)}</div>
-            <div class="v1v1-pct">${crPct}%</div>
-            <div class="v1v1-bar"><div class="v1v1-bar-fill" id="cr-bar" style="width:${crPct}%"></div></div>
-          </div>
-        </div>
-       
-        <div class="v1v1-side">
-          ${ceMediaHTML}
-          <div class="v1v1-media-ov">
-            <div class="v1v1-creator">${esc(d.challengeeName||'Challenger')}<span>${esc(d.challengeeUsername||'')}</span></div>
-            <div class="v1v1-vote-count">${fmtN(d.challengeeVotes||0)}</div>
-            <div class="v1v1-pct">${cePct}%</div>
-            <div class="v1v1-bar"><div class="v1v1-bar-fill" id="ce-bar" style="width:${cePct}%"></div></div>
-          </div>
-        </div>
-      </div>
-      ${actionHTML}
-    </div>
-    <div style="background:var(--bg);padding:14px 16px 80px;">
-      <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--mu);margin-bottom:10px;">COMMENTS</div>
-      <div id="v1v1-comments" class="comments-list" style="padding:0;max-height:300px;overflow-y:auto;"></div>
-      <div class="comment-input-bar" style="position:relative;bottom:auto;padding:0;margin-top:10px;">
-        <div class="com-av-sm">${CUD.photoURL?`<img src="${CUD.photoURL}"/>`:CUD.displayName.charAt(0).toUpperCase()}</div>
-        <div class="com-input-wrap">
-          <input type="text" id="v1v1-com-input" placeholder="Comment..." maxlength="300" oninput="document.getElementById('v1v1-com-send').disabled=!this.value.trim()"/>
-          <button id="v1v1-com-send" class="com-send-btn" disabled onclick="submitInlineComment('challenges','${id}','v1v1-com-input','v1v1-comments')"><i class="fa-solid fa-paper-plane"></i></button>
-        </div>
-      </div>
-    </div>`;
-  loadInlineComments('challenges', id, 'v1v1-comments');
-  checkVoted1v1(id);
-  setTimeout(() => initChalVideos(), 300);
-}
-
-async function acceptC1v1(chalId) {
-  // Show select own post
-  const d_snap = await db.collection('challenges').doc(chalId).get();
-  const d = d_snap.data();
-  // Navigate to join screen reusing it
-  prevScreen = 'view1v1';
-  currentScreen = 'join-community';
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('scr-join-community').classList.add('active');
-  document.getElementById('joining-card').innerHTML = `<div class="jc-name">Accepting: ${esc(d.name)}</div><div class="jc-meta">1v1 vs ${esc(d.challengerUsername)} · Pick your entry post</div>`;
-  joinChalTarget = { ...d, chalId, mode:'accept1v1' };
-  loadMyPostsForJoin();
-}
-
-async function declineC1v1(chalId) {
-  await db.collection('challenges').doc(chalId).update({ status: 'declined' });
-  showToast('Challenge declined.');
-  showScreen('challenges');
-}
-
-async function vote1v1(chalId, side, btn) {
-  const voteId = `${CU.uid}_${chalId}`;
-  const voteRef = db.collection('challengeVotes').doc(voteId);
-  const snap = await voteRef.get();
-  if (snap.exists) { showToast('You already voted in this challenge.'); return; }
-  await voteRef.set({ chalId, userId: CU.uid, side, createdAt: ts() });
-  const update = side==='challenger'
-    ? { challengerVotes: firebase.firestore.FieldValue.increment(1), totalVotes: firebase.firestore.FieldValue.increment(1) }
-    : { challengeeVotes: firebase.firestore.FieldValue.increment(1), totalVotes: firebase.firestore.FieldValue.increment(1) };
-  await db.collection('challenges').doc(chalId).update(update);
-  // Update UI
-  document.querySelectorAll('.vbtn-a,.vbtn-b').forEach(b=>{b.disabled=true;});
-  btn.classList.add('voted');
-  btn.textContent = '✓ Voted!';
-  showToast('✓ Vote counted!');
-  // Refresh vote counts
-  const fresh = await db.collection('challenges').doc(chalId).get();
-  const fd = fresh.data();
-  const tot = (fd.challengerVotes||0)+(fd.challengeeVotes||0);
-  const crP = tot?Math.round((fd.challengerVotes||0)/tot*100):50;
-  const crBar = document.getElementById('cr-bar');
-  const ceBar = document.getElementById('ce-bar');
-  if(crBar) crBar.style.width=crP+'%';
-  if(ceBar) ceBar.style.width=(100-crP)+'%';
-}
-
-async function checkVoted1v1(chalId) {
-  const snap = await db.collection('challengeVotes').doc(`${CU.uid}_${chalId}`).get();
-  if (snap.exists) {
-    const side = snap.data().side;
-    const btnA = document.getElementById('vbtn-cr');
-    const btnB = document.getElementById('vbtn-ce');
-    if (btnA) { btnA.disabled=true; if(side==='challenger'){btnA.classList.add('voted');btnA.textContent='✓ Your Vote';} }
-    if (btnB) { btnB.disabled=true; if(side==='challengee'){btnB.classList.add('voted');btnB.textContent='✓ Your Vote';} }
-  }
-}
-
-// ── COMMUNITY CHALLENGE ──
-async function submitCC() {
-  const name = document.getElementById('cc-name').value.trim();
-  const desc = document.getElementById('cc-desc').value.trim();
-  const niche = document.getElementById('cc-niche').value;
-  const cap = document.getElementById('cc-entry-caption').value.trim();
-  const err = document.getElementById('cc-err');
-  err.classList.add('hidden');
-  if (!name) { showErr(err,'Give the challenge a name.'); return; }
-  if (!cap && !ccMediaFile) { showErr(err,'Add your first entry post (required to start).'); return; }
-  const btn = document.querySelector('#scr-create-community-challenge .btn-or');
-  setBtnLoading(btn, true);
-  try {
-    let mediaURL=null, mediaType=null;
-    if (ccMediaFile) {
-      showToast('Uploading entry...');
-      const res = await uploadToCloudinary(ccMediaFile, `posts/${CU.uid}`);
-      mediaURL=res.url; mediaType=res.type;
-    }
-    // Create the post
-    const pRef = await db.collection('posts').add({
-      authorId: CU.uid, authorName: CUD.displayName,
-      authorUsername: CUD.username, authorNiche: CUD.niche,
-      authorPhoto: CUD.photoURL||null,
-      caption: cap, niche, mediaURL, mediaType,
-      likes:0, comments:0, giftClicks:0, createdAt: ts()
-    });
-    await db.collection('users').doc(CU.uid).update({ postCount: firebase.firestore.FieldValue.increment(1) });
-    // Create challenge
-    const chalRef = await db.collection('challenges').add({
-      type: 'community', name, description: desc, niche,
-      creatorId: CU.uid, creatorUsername: CUD.username, creatorName: CUD.displayName,
-      entryCount: 1, totalVotes: 0,
-      participants: [CU.uid],
-      createdAt: ts()
-    });
-    // Create entry
-    await db.collection('challengeEntries').add({
-      chalId: chalRef.id, postId: pRef.id,
-      authorId: CU.uid, authorName: CUD.displayName,
-      authorUsername: CUD.username, authorPhoto: CUD.photoURL||null,
-      caption: cap, mediaURL, mediaType, votes: 0, niche,
-      createdAt: ts()
-    });
-    CUD.postCount = (CUD.postCount||0)+1;
-    // Reset
-    document.getElementById('cc-name').value='';
-    document.getElementById('cc-desc').value='';
-    document.getElementById('cc-entry-caption').value='';
-    removeMedia('cc-media-preview',null);
-    ccMediaFile=null;
-    showToast('🏆 Community challenge launched!');
-    showScreen('challenges');
-  } catch(e) { showErr(err,e.message); }
-  setBtnLoading(btn,false,'<i class="fa-solid fa-flag"></i> <span>Launch Challenge</span>');
-}
-
-// ── VIEW COMMUNITY CHALLENGE ──
-async function viewCommunity(id, d) {
-  prevScreen = currentScreen;
-  currentScreen = 'viewcommunity';
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('scr-viewcommunity').classList.add('active');
-  const content = document.getElementById('viewcommunity-content');
-  content.innerHTML = '<div class="loading-state"><div class="spin dark"></div><span>Loading...</span></div>';
-  // Load entries
-  const entriesSnap = await db.collection('challengeEntries').where('chalId','==',id).orderBy('votes','desc').get();
-  const entries = [];
-  entriesSnap.forEach(doc => entries.push({ id:doc.id, ...doc.data() }));
-  const alreadyEntered = entries.some(e=>e.authorId===CU.uid);
-  const isCreator = d.creatorId===CU.uid;
-  let gridHTML = '';
-  entries.forEach((e,i) => {
-    const thumbHTML = e.mediaURL
-      ? (e.mediaType==='video'?`<video src="${e.mediaURL}" loop muted playsinline autoplay style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"></video>`:`<img src="${e.mediaURL}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"/>`)
-      : `<div class="cce-no-media">${NICHE_EMOJIS[e.niche]||'🎬'}</div>`;
-    const medals=['🥇','🥈','🥉'];
-    gridHTML += `<div class="cce-item" onclick="viewEntry('${id}','${e.id}',${JSON.stringify(entries).replace(/'/g,"\\'")})" style="position:relative;">
-      ${thumbHTML}
-      <div class="cce-overlay">
-        <div class="cce-rank">${medals[i]||`#${i+1}`}</div>
-        <div class="cce-votes">${fmtN(e.votes)} votes</div>
-        <div class="cce-un">${esc(e.authorUsername)}</div>
-      </div>
-    </div>`;
-  });
-  if (!gridHTML) gridHTML = `<div style="grid-column:1/-1;padding:40px;text-align:center;color:rgba(255,255,255,.3);font-size:13px;">No entries yet. Be the first!</div>`;
-  content.innerHTML = `
-    <div class="cc-hero">
-      <div class="cc-hero-name">${esc(d.name)}</div>
-      ${d.description?`<div class="cc-hero-desc">${esc(d.description)}</div>`:''}
-      <div class="cc-hero-meta">
-        <span class="cc-stat"><i class="fa-solid fa-masks-theater"></i> ${esc(d.niche)}</span>
-        <span class="cc-stat"><i class="fa-solid fa-users"></i> ${d.entryCount||0} entries</span>
-        <span class="cc-stat"><i class="fa-regular fa-thumbs-up"></i> ${d.totalVotes||0} votes</span>
-        <span class="cc-stat"><i class="fa-solid fa-user"></i> by ${esc(d.creatorUsername)}</span>
-      </div>
-      ${!alreadyEntered?`<button class="join-chal-btn" onclick="joinCommunity('${id}',${JSON.stringify(d).replace(/'/g,"\\'")})"><i class="fa-solid fa-plus"></i> Submit Your Entry</button>`:'<div style="margin-top:8px;font-family:Space Mono,monospace;font-size:9px;color:var(--gr);">✓ You\'ve entered this challenge</div>'}
-    </div>
-    <div class="cc-entries-grid" id="cc-entries-grid">${gridHTML}</div>
-    <div style="background:var(--bg);padding:14px 16px 80px;">
-      <div style="font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--mu);margin-bottom:10px;margin-top:10px;">COMMENTS</div>
-      <div id="cc-comments" class="comments-list" style="padding:0;max-height:300px;overflow-y:auto;"></div>
-      <div class="comment-input-bar" style="position:relative;bottom:auto;padding:0;margin-top:10px;">
-        <div class="com-av-sm">${CUD.photoURL?`<img src="${CUD.photoURL}"/>`:CUD.displayName.charAt(0).toUpperCase()}</div>
-        <div class="com-input-wrap">
-          <input type="text" id="cc-com-input" placeholder="Comment on challenge..." maxlength="300" oninput="document.getElementById('cc-com-send').disabled=!this.value.trim()"/>
-          <button id="cc-com-send" class="com-send-btn" disabled onclick="submitInlineComment('challenges','${id}','cc-com-input','cc-comments')"><i class="fa-solid fa-paper-plane"></i></button>
-        </div>
-      </div>
-    </div>`;
-  loadInlineComments('challenges', id, 'cc-comments');
-}
-
-// VIEW SINGLE ENTRY FULL SCREEN
-async function viewEntry(chalId, entryId, entries) {
-  const entry = entries.find(e=>e.id===entryId);
-  if (!entry) return;
-  const overlay = document.createElement('div');
-  overlay.className = 'entry-fullview';
-  const voteId = `${CU.uid}_${chalId}_${entryId}`;
-  const voteSnap = await db.collection('challengeVotes').doc(voteId).get();
-  const hasVoted = voteSnap.exists;
-  let mediaHTML = '';
-  if (entry.mediaURL) {
-    mediaHTML = entry.mediaType==='video'
-      ? `<video class="efv-media" src="${entry.mediaURL}" controls autoplay loop playsinline></video>`
-      : `<img class="efv-media" src="${entry.mediaURL}"/>`;
-  } else {
-    mediaHTML = `<div class="efv-media" style="height:200px;background:var(--deep);display:flex;align-items:center;justify-content:center;font-size:60px;border-radius:var(--r-sm);">${NICHE_EMOJIS[entry.niche]||'🎬'}</div>`;
-  }
-  overlay.innerHTML = `
-    <button class="efv-close" onclick="this.closest('.entry-fullview').remove()"><i class="fa-solid fa-xmark"></i></button>
-    ${mediaHTML}
-    <div class="efv-info">
-      <div class="efv-name">${esc(entry.authorName)}</div>
-      <div class="efv-un">${esc(entry.authorUsername)}</div>
-      ${entry.caption?`<div style="font-size:12px;color:rgba(255,255,255,.5);margin:8px 0;line-height:1.5;">${esc(entry.caption)}</div>`:''}
-      <div class="efv-votes" id="efv-v-${entryId}">${fmtN(entry.votes)}</div>
-      <div class="efv-votes-lbl">VOTES</div>
-      ${entry.authorId!==CU.uid?`<button class="efv-vote-btn ${hasVoted?'voted':''}" id="efv-vbtn-${entryId}" onclick="voteCommunity('${chalId}','${entryId}',this)" ${hasVoted?'disabled':''}>${hasVoted?'✓ Voted':'Vote for this entry'}</button>`:'<div style="font-family:Space Mono,monospace;font-size:10px;color:rgba(255,255,255,.3);margin-top:14px;">Your entry</div>'}
-    </div>`;
-  document.body.appendChild(overlay);
-}
-
-async function voteCommunity(chalId, entryId, btn) {
-  const voteId = `${CU.uid}_${chalId}_${entryId}`;
-  const voteRef = db.collection('challengeVotes').doc(voteId);
-  const snap = await voteRef.get();
-  if (snap.exists) { showToast('Already voted on this entry.'); return; }
-  await voteRef.set({ chalId, entryId, userId: CU.uid, createdAt: ts() });
-  await db.collection('challengeEntries').doc(entryId).update({ votes: firebase.firestore.FieldValue.increment(1) });
-  await db.collection('challenges').doc(chalId).update({ totalVotes: firebase.firestore.FieldValue.increment(1) });
-  btn.textContent='✓ Voted!'; btn.classList.add('voted'); btn.disabled=true;
-  // Update vote count display
-  const vEl = document.getElementById(`efv-v-${entryId}`);
-  if (vEl) {
-    const eSnap = await db.collection('challengeEntries').doc(entryId).get();
-    if (eSnap.exists) vEl.textContent = fmtN(eSnap.data().votes||0);
-  }
-  showToast('✓ Vote counted!');
-}
-
-// JOIN COMMUNITY CHALLENGE
-function joinCommunity(chalId, d) {
-  joinChalTarget = { ...d, chalId, mode:'joincommunity' };
-  document.getElementById('joining-card').innerHTML = `<div class="jc-name">${esc(d.name)}</div><div class="jc-meta">Community challenge · ${d.niche} · ${d.entryCount} entries</div>`;
-  loadMyPostsForJoin();
-  prevScreen = currentScreen;
-  currentScreen = 'join-community';
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('scr-join-community').classList.add('active');
-}
-
-async function loadMyPostsForJoin() {
-  const list = document.getElementById('join-existing-list');
-  list.innerHTML = '<div class="loading-state" style="padding:14px;"><div class="spin dark"></div></div>';
-  selectedJoinPost = null;
-  const snap = await db.collection('posts').where('authorId','==',CU.uid).orderBy('createdAt','desc').limit(12).get();
-  if (snap.empty) { list.innerHTML='<div style="font-size:12px;color:var(--mu);padding:10px 0;text-align:center;">No posts yet. Use New Post option above.</div>'; return; }
+  if(chals.length===0){list.innerHTML='<div class="empty"><i class="fa-solid fa-shield-halved"></i><p>No active challenges for this post yet.</p></div>';return;}
   list.innerHTML='';
+  chals.forEach(d=>{
+    const isExpired=d.expiresAt&&d.expiresAt.toDate()<new Date();
+    const row=document.createElement('div');
+    row.className='cvm-row';
+    const crThumb=d.challengerThumbURL||d.challengerMediaURL;
+    const ceThumb=d.challengeeThumbURL||d.challengeeMediaURL;
+    const tot=(d.challengerVotes||0)+(d.challengeeVotes||0);
+    const crP=tot?Math.round((d.challengerVotes||0)/tot*100):50;
+    row.innerHTML=`
+      <div class="cvm-top"><div class="cvm-name">${esc(d.name||'Battle')}</div><div class="cvm-timer">${isExpired?'Ended':timeLeft(d.expiresAt?.toDate())}</div></div>
+      <div class="cvm-thumbs">
+        <div class="cvm-cr"><div class="cvm-thumb">${crThumb?`<img src="${crThumb}"/>`:'<div class="cvm-thumb-placeholder">🎭</div>'}</div><div class="cvm-cr-name">${esc(d.challengerName||'')}<span>${esc(d.challengerUsername||'')}</span></div><div class="cvm-votes">${fmtN(d.challengerVotes||0)}</div></div>
+        <div class="cvm-vs-lbl">VS</div>
+        <div class="cvm-cr"><div class="cvm-thumb">${ceThumb?`<img src="${ceThumb}"/>`:'<div class="cvm-thumb-placeholder">⏳</div>'}</div><div class="cvm-cr-name">${esc(d.challengeeName||'')}<span>${esc(d.challengeeUsername||'')}</span></div><div class="cvm-votes">${fmtN(d.challengeeVotes||0)}</div></div>
+      </div>
+      <div class="cvm-footer"><div class="cvm-footer-lbl">${tot} votes · ${esc(d.niche||'comedy')}</div><div class="cvm-go" onclick="closeModal('chal-vote-modal');viewBattle('${d.id}')">Vote Now →</div></div>`;
+    list.appendChild(row);
+  });
+}
+
+// ─────────────────────────────────────────────
+// CREATE 1V1 MODAL
+// ─────────────────────────────────────────────
+async function openC1v1Modal(targetPostId, targetAuthorId, targetName, targetUsername, targetThumb) {
+  c1PostTarget={postId:targetPostId,authorId:targetAuthorId,name:targetName,username:targetUsername,thumb:targetThumb};
+  c1SelPost=null; c1MediaFile=null;
+  // Set target card
+  const tc=document.getElementById('c1-target');
+  tc.innerHTML=`<div class="c1t-thumb">${targetThumb?`<img src="${targetThumb}"/>`:'<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:24px;">🎭</div>'}</div><div class="c1t-info"><div class="lbl">CHALLENGING THIS POST BY</div><div class="nm">${esc(targetName)}</div><div class="un">${esc(targetUsername)}</div></div>`;
+  document.getElementById('c1-name').value='';
+  document.getElementById('c1-err').classList.add('hidden');
+  document.getElementById('create-1v1-modal').classList.remove('hidden');
+  // Load my posts
+  loadMyPostsForPicker('c1-existing','c1Sel');
+}
+
+async function loadMyPostsForPicker(listId, selKey) {
+  const list=document.getElementById(listId); if(!list)return;
+  list.innerHTML='<div class="loading" style="padding:14px;"><div class="spin dark"></div></div>';
+  const snap=await db.collection('posts').where('authorId','==',CU.uid).orderBy('createdAt','desc').limit(12).get();
+  if(snap.empty){list.innerHTML='<div style="font-size:12px;color:var(--mu);padding:10px;text-align:center;">No posts yet. Create a post first or use New Post.</div>';return;}
+  list.innerHTML='';
+  if(selKey==='c1Sel')c1SelPost=null;
+  else if(selKey==='joinSel')joinSelPost=null;
   snap.forEach(doc=>{
     const d=doc.data();
     const item=document.createElement('div');
     item.className='ep-item';
-    item.dataset.postId=doc.id;
-    const thumbHTML=d.mediaURL?(d.mediaType==='video'?`<video src="${d.mediaURL}" style="width:100%;height:100%;object-fit:cover;"></video>`:`<img src="${d.mediaURL}" style="width:100%;height:100%;object-fit:cover;"/>`):`<span>${NICHE_EMOJIS[d.niche]||'🎬'}</span>`;
-    item.innerHTML=`<div class="ep-thumb">${thumbHTML}</div><div class="ep-info"><p>${esc((d.caption||'No caption').substring(0,50))}</p><small>${d.niche}·${d.createdAt?timeAgo(d.createdAt.toDate()):'recently'}</small></div><i class="fa-regular fa-circle-check ep-check"></i>`;
+    const thumb=d.thumbURL||d.mediaURL;
+    const thumbHTML=thumb?(d.mediaType==='video'?`<img src="${d.thumbURL||d.mediaURL}" style="width:100%;height:100%;object-fit:cover;"/>`:`<img src="${d.mediaURL}" style="width:100%;height:100%;object-fit:cover;"/>`):`<span>🎭</span>`;
+    item.innerHTML=`<div class="ep-thumb">${thumbHTML}</div><div class="ep-info" style="flex:1;min-width:0;"><p>${esc((d.caption||'No caption').substring(0,50))}</p><small>${d.createdAt?timeAgo(d.createdAt.toDate()):'recently'}</small></div><i class="fa-regular fa-circle-check ep-check"></i>`;
     item.onclick=()=>{
-      document.querySelectorAll('#join-existing-list .ep-item').forEach(i=>{i.classList.remove('sel');i.querySelector('.ep-check').className='fa-regular fa-circle-check ep-check';});
+      document.querySelectorAll(`#${listId} .ep-item`).forEach(i=>{i.classList.remove('sel');i.querySelector('.ep-check').className='fa-regular fa-circle-check ep-check';});
       item.classList.add('sel');item.querySelector('.ep-check').className='fa-solid fa-circle-check ep-check';
-      selectedJoinPost={postId:doc.id,caption:d.caption,mediaURL:d.mediaURL,mediaType:d.mediaType};
+      const post={postId:doc.id,caption:d.caption,mediaURL:d.mediaURL,mediaType:d.mediaType,thumbURL:d.thumbURL||null};
+      if(selKey==='c1Sel')c1SelPost=post;
+      else if(selKey==='joinSel')joinSelPost=post;
     };
     list.appendChild(item);
   });
 }
 
-function setJoinTab(el,tab){
-  document.querySelectorAll('#scr-join-community .picker-tab').forEach(t=>t.classList.remove('active'));
+function setPickTab(el, tab) {
+  const parent=el.closest('.post-form,.modal-sheet');
+  if(!parent)return;
+  parent.querySelectorAll('.ptab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  document.getElementById('join-existing-list').classList.toggle('hidden',tab!=='existing');
-  document.getElementById('join-new-section').classList.toggle('hidden',tab!=='new');
+  // Determine which sections to toggle
+  const existing=parent.querySelector('[id$="-existing"],[id="c1-existing"],[id="join-existing"]');
+  const newSec=parent.querySelector('[id$="-new"],[id="c1-new"],[id="join-new"]');
+  if(existing)existing.classList.toggle('hidden',tab!=='existing'&&tab!=='c1-existing'&&tab!=='join-existing'&&tab==='new'&&tab==='c1-new'&&tab==='join-new');
+  if(newSec)newSec.classList.toggle('hidden',tab!=='new'&&tab!=='c1-new'&&tab!=='join-new');
+  // Simpler: just check last segment
+  const t=tab.split('-').pop();
+  if(existing)existing.classList.toggle('hidden',t!=='existing');
+  if(newSec)newSec.classList.toggle('hidden',t!=='new');
 }
 
-async function submitJoin() {
-  if (!joinChalTarget) return;
-  const isNew = !document.getElementById('join-new-section').classList.contains('hidden');
-  const err = document.getElementById('join-err');
+let prevC1MediaFile=null;
+function prevC1Media(input){const f=input.files[0];if(!f)return;c1MediaFile=f;showMPrev(f,'c1-media-prev',null);}
+
+async function submitC1v1() {
+  if(!c1PostTarget){closeModal('create-1v1-modal');return;}
+  const name=document.getElementById('c1-name').value.trim();
+  const expiry=parseInt(document.getElementById('c1-expiry').value);
+  const err=document.getElementById('c1-err');
   err.classList.add('hidden');
-  const btn = document.querySelector('#scr-join-community .btn-or');
-  setBtnLoading(btn,true);
-  try {
-    let postId, caption, mediaURL, mediaType;
-    if (isNew) {
-      const cap = document.getElementById('join-caption').value.trim();
-      if (!cap && !joinMediaFile) { showErr(err,'Add caption or media.'); setBtnLoading(btn,false,'<i class="fa-solid fa-shield-halved"></i> <span>Submit Entry</span>'); return; }
-      if (joinMediaFile) {
-        showToast('Uploading...');
-        const res = await uploadToCloudinary(joinMediaFile,`posts/${CU.uid}`);
-        mediaURL=res.url; mediaType=res.type;
-      }
-      caption = cap;
-      const niche = joinChalTarget.niche || CUD.niche;
-      const pRef = await db.collection('posts').add({
-        authorId:CU.uid,authorName:CUD.displayName,authorUsername:CUD.username,
-        authorNiche:CUD.niche,authorPhoto:CUD.photoURL||null,
-        caption,niche,mediaURL:mediaURL||null,mediaType:mediaType||null,
-        likes:0,comments:0,giftClicks:0,createdAt:ts()
-      });
+  if(!name){showErr(err,'Give the challenge a name.');return;}
+  const isNew=!document.getElementById('c1-new').classList.contains('hidden');
+  if(isNew&&!c1MediaFile&&!document.getElementById('c1-cap').value.trim()){showErr(err,'Add a caption or media.');return;}
+  if(!isNew&&!c1SelPost){showErr(err,'Select one of your posts.');return;}
+  const btn=document.querySelector('#create-1v1-modal .btn-or');
+  setBtnLoad(btn,true);
+  try{
+    let entryPostId,cap,mURL,mType,tURL;
+    if(isNew){
+      cap=document.getElementById('c1-cap').value.trim();
+      if(c1MediaFile){showToast('Uploading...');const res=await uploadWithThumb(c1MediaFile,`posts/${CU.uid}`);mURL=res.url;mType=res.type;tURL=res.thumbURL;}
+      const pRef=await db.collection('posts').add({authorId:CU.uid,authorName:CUD.displayName,authorUsername:CUD.username,authorPhoto:CUD.photoURL||null,caption:cap,niche:'comedy',mediaURL:mURL||null,mediaType:mType||null,thumbURL:tURL||null,likes:0,comments:0,giftClicks:0,createdAt:ts()});
       await db.collection('users').doc(CU.uid).update({postCount:firebase.firestore.FieldValue.increment(1)});
-      postId=pRef.id; CUD.postCount=(CUD.postCount||0)+1;
-    } else {
-      if (!selectedJoinPost) { showErr(err,'Select a post.'); setBtnLoading(btn,false,'<i class="fa-solid fa-shield-halved"></i> <span>Submit Entry</span>'); return; }
-      postId=selectedJoinPost.postId; caption=selectedJoinPost.caption; mediaURL=selectedJoinPost.mediaURL; mediaType=selectedJoinPost.mediaType;
+      CUD.postCount=(CUD.postCount||0)+1;
+      entryPostId=pRef.id;
+    }else{
+      entryPostId=c1SelPost.postId;cap=c1SelPost.caption;mURL=c1SelPost.mediaURL;mType=c1SelPost.mediaType;tURL=c1SelPost.thumbURL;
     }
-    const chalId = joinChalTarget.chalId;
-    if (joinChalTarget.mode==='accept1v1') {
-      // Accept 1v1
-      await db.collection('challenges').doc(chalId).update({
-        challengeePostId:postId,challengeeCaption:caption||'',
-        challengeeMediaURL:mediaURL||null,challengeeMediaType:mediaType||null,
-        status:'active',entryCount:2,
-        acceptedAt:ts()
-      });
-      addNotif(joinChalTarget.challengerId,'chal',`${CUD.username} accepted your 1v1 challenge! Voting is open.`,'challenges',chalId);
-      showToast('✓ Challenge accepted! Voting is now open.');
-    } else {
-      // Join community
-      await db.collection('challengeEntries').add({
-        chalId,postId,authorId:CU.uid,authorName:CUD.displayName,
-        authorUsername:CUD.username,authorPhoto:CUD.photoURL||null,
-        caption:caption||'',mediaURL:mediaURL||null,mediaType:mediaType||null,
-        votes:0,niche:joinChalTarget.niche||CUD.niche,createdAt:ts()
-      });
-      await db.collection('challenges').doc(chalId).update({
-        entryCount:firebase.firestore.FieldValue.increment(1),
-        participants:firebase.firestore.FieldValue.arrayUnion(CU.uid)
-      });
-      showToast('🏆 Entry submitted!');
-    }
-    document.getElementById('join-caption').value='';
-    removeMedia('join-media-preview',null); joinMediaFile=null; selectedJoinPost=null; joinChalTarget=null;
-    showScreen('challenges');
-  } catch(e) { showErr(err,e.message); }
-  setBtnLoading(btn,false,'<i class="fa-solid fa-shield-halved"></i> <span>Submit Entry</span>');
-}
-
-// ═══════════════════════════════════════════
-// PROFILE
-// ═══════════════════════════════════════════
-async function initProfile(uid, isOwn, containerId) {
-  const container = document.getElementById(containerId || 'profile-content');
-  container.innerHTML = '<div class="loading-state"><div class="spin dark"></div><span>Loading profile...</span></div>';
-  const snap = await db.collection('users').doc(uid).get();
-  if (!snap.exists) { container.innerHTML='<div class="loading-state"><p>Profile not found.</p></div>'; return; }
-  const u = snap.data();
-  if (isOwn) { CUD = u; }
-  const lv = getLevel(u);
-  const postsSnap = await db.collection('posts').where('authorId','==',uid).orderBy('createdAt','desc').limit(12).get();
-  let postsGrid = '';
-  postsSnap.forEach(doc => {
-    const d=doc.data();
-    const thumbHTML=d.mediaURL?(d.mediaType==='video'?`<video src="${d.mediaURL}" style="width:100%;height:100%;object-fit:cover;display:block;"></video>`:`<img src="${d.mediaURL}" style="width:100%;height:100%;object-fit:cover;display:block;"/>`):`<div class="pg-placeholder">${esc((d.caption||'').substring(0,40))}</div>`;
-    postsGrid+=`<div class="pg-item">${thumbHTML}<div class="pg-ov"><span><i class="fa-solid fa-coins"></i>${d.giftClicks||0}</span></div></div>`;
-  });
-  const avHTML = u.photoURL ? `<img src="${u.photoURL}"/>` : u.displayName.charAt(0).toUpperCase();
-  container.innerHTML = `
-    <div class="prof-cover">
-      <div class="prof-cover-glow"></div>
-      <div class="prof-av-wrap"><div class="prof-av">${avHTML}<div class="prof-av-ring"></div></div></div>
-    </div>
-    <div class="prof-body">
-      <div class="prof-name">${esc(u.displayName)}</div>
-      <div class="prof-urow">
-        <span class="prof-user">${esc((u.username||'').split('@')[0])}<span>@${esc(u.niche||'')}</span></span>
-        <div class="level-badge"><i class="fa-solid fa-arrow-up"></i>${lv.name}</div>
-      </div>
-      ${u.bio?`<div class="prof-bio">${esc(u.bio)}</div>`:''}
-      <div class="prof-stats">
-        <div class="ps"><div class="ps-v">${fmtN(u.postCount||0)}</div><div class="ps-l">Posts</div></div>
-        <div class="ps"><div class="ps-v">${fmtN(u.followers||0)}</div><div class="ps-l">Followers</div></div>
-        <div class="ps"><div class="ps-v or">${fmtN(u.challengeWins||0)}</div><div class="ps-l">Wins</div></div>
-        <div class="ps"><div class="ps-v go">${fmtN(u.giftClicksReceived||0)}</div><div class="ps-l">Gifts</div></div>
-      </div>
-      ${isOwn
-        ? `<div class="prof-acts"><button class="prof-edit-btn" onclick="showToast('Edit profile coming soon!')">Edit Profile</button></div>`
-        : `<div class="prof-acts"><button class="prof-follow-btn" id="pf-btn-${uid}" onclick="toggleFollow('${uid}','',this)">Follow</button><button class="prof-chal-btn" onclick="startC1v1('${uid}','${esc(u.username||'')}','${esc(u.displayName)}','${u.photoURL||''}','')"><i class="fa-solid fa-shield-halved"></i> Challenge</button></div>`}
-      <div class="prof-divider"></div>
-      <div class="prof-sec-title">Gift Intents</div>
-      <div class="gift-block">
-        <div class="gb-ico"><i class="fa-solid fa-coins"></i></div>
-        <div><div class="gb-v">${fmtN(u.giftClicksReceived||0)}</div><div class="gb-l">Fans would have gifted · Real Mobile Money in V1</div></div>
-      </div>
-      <div class="prof-sec-title">Level Progress</div>
-      <div class="level-prog-block">
-        <div class="lp-top"><div class="lp-name">${lv.name}</div>${lv.next?`<div class="lp-next">→ ${lv.next.name} at ${fmtN(lv.next.min)} pts</div>`:''}</div>
-        <div class="lp-bar"><div class="lp-fill" style="width:${lv.pct}%"></div></div>
-        <div class="lp-hint">${fmtN(lv.score)} pts · Post, win challenges & get gifts to level up</div>
-      </div>
-      <div class="prof-sec-title">Posts</div>
-      <div class="posts-grid">${postsGrid||'<div style="grid-column:1/-1;padding:30px;text-align:center;color:var(--mu);font-size:13px;">No posts yet.</div>'}</div>
-    </div>`;
-  if (!isOwn) checkFollowing(uid, `pf-btn-${uid}`);
-}
-
-// ═══════════════════════════════════════════
-// COMMENTS
-// ═══════════════════════════════════════════
-function openComments(collection, docId) {
-  currentCommentTarget = { collection, docId };
-  prevScreen = currentScreen;
-  currentScreen = 'comments';
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById('scr-comments').classList.add('active');
-  const avEl = document.getElementById('com-av-sm');
-  avEl.innerHTML = CUD.photoURL ? `<img src="${CUD.photoURL}"/>` : CUD.displayName.charAt(0).toUpperCase();
-  document.getElementById('com-text').value='';
-  document.getElementById('com-send').disabled=true;
-  loadCommentsFull();
-}
-
-function closeComments() {
-  currentCommentTarget=null;
-  if (commentsUnsub) commentsUnsub();
-  goBack();
-}
-
-function loadCommentsFull() {
-  if (!currentCommentTarget) return;
-  const list = document.getElementById('comments-list');
-  list.innerHTML='<div class="loading-state"><div class="spin dark"></div><span>Loading...</span></div>';
-  if (commentsUnsub) commentsUnsub();
-  commentsUnsub = db.collection(currentCommentTarget.collection).doc(currentCommentTarget.docId)
-    .collection('comments').orderBy('createdAt','asc')
-    .onSnapshot(snap => {
-      if (snap.empty) { list.innerHTML='<div class="com-empty"><i class="fa-regular fa-comment-dots"></i><p>No comments yet. Be the first!</p></div>'; return; }
-      list.innerHTML='';
-      snap.forEach(doc => list.appendChild(buildComment(doc.data(), doc.id, currentCommentTarget.collection, currentCommentTarget.docId)));
-      list.scrollTop=list.scrollHeight;
+    const expiresAt=new Date(Date.now()+expiry*24*60*60*1000);
+    const chalRef=await db.collection('challenges').add({
+      type:'1v1',name,niche:'comedy',
+      challengerId:CU.uid,challengerUsername:CUD.username,challengerName:CUD.displayName,challengerPhoto:CUD.photoURL||null,
+      challengerPostId:entryPostId,challengerCaption:cap||'',challengerMediaURL:mURL||null,challengerMediaType:mType||null,challengerThumbURL:tURL||null,challengerVotes:0,
+      challengeeId:c1PostTarget.authorId,challengeeUsername:c1PostTarget.username,challengeeName:c1PostTarget.name,challengeePhoto:null,
+      challengeePostId:c1PostTarget.postId,challengeeCaption:'',challengeeMediaURL:null,challengeeMediaType:null,challengeeThumbURL:c1PostTarget.thumb||null,challengeeVotes:0,
+      status:'pending',expiresAt,entryCount:2,totalVotes:0,comments:0,
+      participants:[CU.uid,c1PostTarget.authorId],createdAt:ts()
     });
+    await db.collection('users').doc(c1PostTarget.authorId).update({challengeRequestsReceived:firebase.firestore.FieldValue.increment(1)});
+    addNotif(c1PostTarget.authorId,'chal',`${CUD.username} challenged your post to a 1v1! Tap to respond.`,'challenges',chalRef.id);
+    closeModal('create-1v1-modal');
+    showToast('⚔️ Challenge sent!');
+    // Update badge
+    await updateBadges(CU.uid);
+  }catch(e){showErr(err,e.message);}
+  setBtnLoad(btn,false,'<i class="fa-solid fa-shield-halved"></i> <span>Send Challenge</span>');
 }
 
-async function submitComment() {
-  if (!currentCommentTarget) return;
-  const input = document.getElementById('com-text');
-  const text = input.value.trim();
-  if (!text) return;
-  input.value=''; document.getElementById('com-send').disabled=true;
-  await postComment(currentCommentTarget.collection, currentCommentTarget.docId, text);
-}
-
-/*async function submitInlineComment(collection, docId, inputId, listId) {
-  const input = document.getElementById(inputId);
-  const text = input.value.trim();
-  if (!text) return;
-  input.value=''; document.getElementById(inputId.replace('input','send')+'-send').disabled=true;
-  await postComment(collection, docId, text);
-  // Reload inline
-  loadInlineComments(collection, docId, listId);
-}*/
-async function submitInlineComment(collection, docId, inputId, listId) {
-  const input = document.getElementById(inputId);
-  if (!input) return;
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
-  const sendId = inputId.replace('com-input', 'com-send').replace('input', 'send');
-  const sendBtn = document.getElementById(sendId);
-  if (sendBtn) sendBtn.disabled = true;
-  await postComment(collection, docId, text);
-  loadInlineComments(collection, docId, listId);
-}
-
-async function postComment(collection, docId, text) {
-  await db.collection(collection).doc(docId).collection('comments').add({
-    authorId:CU.uid,authorName:CUD.displayName,
-    authorUsername:CUD.username,authorPhoto:CUD.photoURL||null,
-    text,createdAt:ts()
-  });
-  // Increment comment count if it's a post
-  if (collection==='posts') {
-    await db.collection('posts').doc(docId).update({comments:firebase.firestore.FieldValue.increment(1)});
-  }
-}
-
-function loadInlineComments(collection, docId, listId) {
-  const list = document.getElementById(listId);
-  if (!list) return;
-  db.collection(collection).doc(docId).collection('comments').orderBy('createdAt','asc').limit(20)
-    .onSnapshot(snap => {
-      if (snap.empty) { list.innerHTML='<div class="com-empty" style="padding:20px;"><i class="fa-regular fa-comment-dots" style="font-size:24px;"></i><p style="font-size:12px;">No comments yet.</p></div>'; return; }
-      list.innerHTML=''; snap.forEach(doc => list.appendChild(buildComment(doc.data(), doc.id, collection, docId)));
-      list.scrollTop=list.scrollHeight;
-    });
-}
-
-function buildComment(d, commentId, collection, docId) {
-  const div = document.createElement('div');
-  div.className = 'com-item';
-  div.dataset.commentId = commentId;
-  const avHTML = d.authorPhoto
-    ? `<div class="com-av"><img src="${d.authorPhoto}"/></div>`
-    : `<div class="com-av">${(d.authorName||'?').charAt(0).toUpperCase()}</div>`;
-  div.innerHTML = `
-    ${avHTML}
-    <div class="com-body">
-      <div class="com-hdr">
-        <span class="com-name">${esc(d.authorName)}</span>
-        <span class="com-un">${esc(d.authorUsername)}</span>
-        <span class="com-time">${d.createdAt ? timeAgo(d.createdAt.toDate()) : 'now'}</span>
+// ─────────────────────────────────────────────
+// RESPOND TO CHALLENGE
+// ─────────────────────────────────────────────
+async function showRespondChallenge(chalId) {
+  const snap=await db.collection('challenges').doc(chalId).get();
+  if(!snap.exists)return;
+  respondChalData={...snap.data(),chalId};
+  const d=respondChalData;
+  const body=document.getElementById('respond-body');
+  const crThumb=d.challengerThumbURL||d.challengerMediaURL;
+  const ceThumb=d.challengeeThumbURL||d.challengeeMediaURL;
+  body.innerHTML=`
+    <div class="respond-hero">
+      <div class="respond-hero-name">⚔️ ${esc(d.name||'Challenge Request')}</div>
+      <div class="respond-hero-meta">
+        <span><i class="fa-regular fa-clock"></i> ${d.expiresAt?timeLeft(d.expiresAt.toDate()):'No expiry'}</span>
+        <span><i class="fa-solid fa-masks-theater"></i> Comedy</span>
       </div>
-      <div class="com-text">${esc(d.text)}</div>
-      <div class="com-actions">
-        <button class="reply-btn" onclick="toggleReplyBox('${commentId}','${esc(d.authorUsername)}','${collection}','${docId}')">
-          <i class="fa-solid fa-reply"></i> Reply
-        </button>
-        <span class="reply-count" id="rc-${commentId}"></span>
-      </div>
-      <div class="reply-input-wrap hidden" id="ri-${commentId}">
-        <div class="reply-input-row">
-          <div class="com-av-sm">${CUD.photoURL?`<img src="${CUD.photoURL}"/>`:(CUD.displayName||'?').charAt(0).toUpperCase()}</div>
-          <div class="com-input-wrap" style="flex:1;">
-            <input type="text" id="rit-${commentId}" placeholder="Replying to ${esc(d.authorUsername)}..." maxlength="200"
-              oninput="document.getElementById('rsb-${commentId}').disabled=!this.value.trim()"/>
-            <button id="rsb-${commentId}" class="com-send-btn" disabled
-              onclick="submitReply('${collection}','${docId}','${commentId}','rit-${commentId}','replies-${commentId}')">
-              <i class="fa-solid fa-paper-plane"></i>
-            </button>
-          </div>
+      <div class="respond-posts">
+        <div class="respond-side">
+          <div class="respond-side-label">CHALLENGER'S POST</div>
+          <div class="respond-side-name">${esc(d.challengerName||'')}</div>
+          <div class="respond-side-un">${esc(d.challengerUsername||'')}</div>
+          ${crThumb?`<img class="respond-media" src="${crThumb}"/>`:'<div class="respond-media" style="background:var(--deep);display:flex;align-items:center;justify-content:center;font-size:36px;">🎭</div>'}
+        </div>
+        <div class="respond-side">
+          <div class="respond-side-label">YOUR POST (BEING CHALLENGED)</div>
+          <div class="respond-side-name">${esc(CUD.displayName)}</div>
+          <div class="respond-side-un">${esc(CUD.username||'')}</div>
+          ${ceThumb?`<img class="respond-media" src="${ceThumb}"/>`:'<div class="respond-media" style="background:var(--deep);display:flex;align-items:center;justify-content:center;font-size:36px;">🎭</div>'}
         </div>
       </div>
-      <div class="replies-list" id="replies-${commentId}"></div>
+    </div>
+    <div class="respond-body">
+      <div class="respond-note"><i class="fa-solid fa-info-circle"></i><p>Your specific post is already selected as the challenged post. You just need to accept or decline. If you accept, voting opens immediately and fans decide the winner.</p></div>
+      <div class="respond-btns">
+        <button class="resp-accept" onclick="acceptChallenge('${chalId}')"><i class="fa-solid fa-check"></i> Accept Challenge</button>
+        <button class="resp-decline" onclick="declineChallenge('${chalId}')">Decline</button>
+      </div>
     </div>`;
-  // Load replies
-// Load replies after element is in DOM
-  setTimeout(() => loadReplies(collection, docId, commentId), 100);
+  prevScr=curScr; curScr='respond-challenge';
+  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('active'));
+  document.getElementById('scr-respond-challenge').classList.add('active');
+}
+
+async function acceptChallenge(chalId) {
+  await db.collection('challenges').doc(chalId).update({status:'active',acceptedAt:ts()});
+  await db.collection('users').doc(respondChalData?.challengerId).update({challengeCount:firebase.firestore.FieldValue.increment(1)}).catch(()=>{});
+  await db.collection('users').doc(CU.uid).update({challengeCount:firebase.firestore.FieldValue.increment(1)}).catch(()=>{});
+  if(respondChalData?.challengerId) addNotif(respondChalData.challengerId,'chal',`${CUD.username} accepted your challenge! Voting is now open.`,'challenges',chalId);
+  showToast('✓ Challenge accepted! Voting is open.');
+  showScr('challenges');
+}
+
+async function declineChallenge(chalId) {
+  await db.collection('challenges').doc(chalId).update({status:'declined'});
+  showToast('Challenge declined.');
+  showScr('challenges');
+}
+
+// ─────────────────────────────────────────────
+// CHALLENGES PAGE
+// ─────────────────────────────────────────────
+function setChalTab(el) {
+  document.querySelectorAll('.ctab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  chalTab=el.dataset.t;
+  initChallenges();
+}
+
+function initChallenges() {
+  const body=document.getElementById('chal-body');
+  body.innerHTML='<div class="loading"><div class="spin dark"></div><span>Loading...</span></div>';
+  if(chalUnsub)chalUnsub();
+  if(chalTab==='battles') initBattles();
+  else if(chalTab==='community') initCommunity();
+  else if(chalTab==='leaderboard') initLeaderboard();
+}
+
+function initBattles() {
+  const body=document.getElementById('chal-body');
+  const feed=document.createElement('div');
+  feed.className='battles-feed';
+  body.innerHTML='';
+  body.appendChild(feed);
+  const q=db.collection('challenges').where('type','==','1v1').orderBy('createdAt','desc').limit(20);
+  chalUnsub=q.onSnapshot(snap=>{
+    feed.innerHTML='';
+    if(snap.empty){
+      feed.innerHTML=`<div style="height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:40px;text-align:center;color:rgba(255,255,255,.5);"><i class="fa-solid fa-shield-halved" style="font-size:44px;opacity:.3;"></i><h3 style="color:#fff;font-size:17px;font-family:Bebas Neue,sans-serif;letter-spacing:1px;">No battles yet</h3><p style="font-size:13px;line-height:1.6;">Challenge someone from the feed to start the first battle!</p><button class="btn-or" onclick="showScr('feed')"><i class="fa-solid fa-clapperboard"></i> Go To Feed</button></div>`;
+      return;
+    }
+    snap.forEach(doc=>feed.appendChild(buildBattleCard(doc.id,doc.data())));
+  },err=>{
+    body.innerHTML='<div class="empty"><i class="fa-solid fa-database"></i><p>Index building... Check Firebase console for a link and click Create Index.</p></div>';
+  });
+}
+
+function buildBattleCard(chalId, d) {
+  const div=document.createElement('div');
+  div.className='battle-card';
+  const isExpired=d.expiresAt&&d.expiresAt.toDate()<new Date();
+  const isPending=d.status==='pending';
+  const isActive=d.status==='active';
+  const tot=(d.challengerVotes||0)+(d.challengeeVotes||0);
+  const crPct=tot?Math.round((d.challengerVotes||0)/tot*100):50;
+  const cePct=100-crPct;
+  const iAmChallengee=d.challengeeId===CU.uid;
+  const iAmChallenger=d.challengerId===CU.uid;
+  function bSide(sideId,mURL,mType,tURL,name,uname,votes,pct){
+    if(!mURL)return`<div class="bc-mwrap" style="display:flex;align-items:center;justify-content:center;"><span style="font-size:${isPending?'20px':'36px'};color:rgba(255,255,255,.3);">${isPending&&iAmChallengee?'Your post':'⏳'}</span></div>`;
+    if(mType==='video')return`<div class="bc-mwrap">${tURL?`<img id="${sideId}-thumb" src="${tURL}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2;"/>`:''}
+      <video id="${sideId}-vid" src="${mURL}" playsinline muted loop preload="auto" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;"></video>
+      <div class="bc-play-icon" id="${sideId}-pi"><i class="fa-solid fa-play"></i></div>
+      <div class="bc-pause-ind" id="${sideId}-pause"><i class="fa-solid fa-pause"></i></div>
+      <div class="bc-mute-btn" onclick="toggleBcMute(event)"><i class="fa-solid ${isMuted?'fa-volume-xmark':'fa-volume-high'}"></i></div>
+      <div class="bc-ov"><div class="bc-cr-name">${esc(name||'')}<span>${esc(uname||'')}</span></div><div class="bc-votes">${fmtN(votes||0)}</div><div class="bc-pct">${pct}%</div><div class="bc-bar"><div class="bc-bar-fill" style="width:${pct}%"></div></div></div></div>`;
+    return`<div class="bc-mwrap"><img src="${mURL}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"/><div class="bc-ov"><div class="bc-cr-name">${esc(name||'')}<span>${esc(uname||'')}</span></div><div class="bc-votes">${fmtN(votes||0)}</div><div class="bc-pct">${pct}%</div><div class="bc-bar"><div class="bc-bar-fill" style="width:${pct}%"></div></div></div></div>`;
+  }
+  let actionHTML='';
+  if(isPending&&iAmChallengee){
+    actionHTML=`<div class="bc-accept-row"><button class="bc-accept" onclick="showRespondChallenge('${chalId}')"><i class="fa-solid fa-check"></i> Accept Challenge</button><button class="bc-decline" onclick="declineChallenge('${chalId}')">Decline</button></div>`;
+  }else if(isPending){
+    actionHTML=`<div class="bc-pending"><i class="fa-regular fa-clock"></i><p>Waiting for ${esc(d.challengeeName||'')} to accept your challenge.</p></div>`;
+  }else if(isActive&&!isExpired){
+    actionHTML=`<div class="bc-vote-row"><button class="bc-vbtn-a" id="bc-va-${chalId}" onclick="voteBattle('${chalId}','challenger',this)">Vote ${esc(d.challengerName||'')}</button><button class="bc-vbtn-b" id="bc-vb-${chalId}" onclick="voteBattle('${chalId}','challengee',this)">Vote ${esc(d.challengeeName||'')}</button></div>`;
+  }else if(isExpired){
+    const winner=(d.challengerVotes||0)>=(d.challengeeVotes||0)?d.challengerName:d.challengeeName;
+    actionHTML=`<div class="bc-won"><i class="fa-solid fa-trophy"></i><p>🏆 <strong>${esc(winner)}</strong> wins this battle!</p></div>`;
+  }
+  div.innerHTML=`
+    <div class="bc-glow"></div><div class="bc-grid"></div>
+    <div class="bc-top">
+      <div class="bc-name">⚔️ <span>${esc(d.name||'Untitled')}</span></div>
+      ${d.expiresAt?`<div class="bc-timer-chip">${isExpired?'Ended':timeLeft(d.expiresAt.toDate())}</div>`:''}
+    </div>
+    <div class="bc-posts" id="bc-grid-${chalId}">
+      <div class="bc-side" onclick="playBcVid('bc-cr','bc-ce','${chalId}')">${bSide('bc-cr',d.challengerMediaURL,d.challengerMediaType,d.challengerThumbURL,d.challengerName,d.challengerUsername,d.challengerVotes,crPct)}</div>
+      <div class="bc-vs">VS</div>
+      <div class="bc-side" onclick="playBcVid('bc-ce','bc-cr','${chalId}')">${bSide('bc-ce',d.challengeeMediaURL,d.challengeeMediaType,d.challengeeThumbURL,d.challengeeName,d.challengeeUsername,d.challengeeVotes,cePct)}</div>
+    </div>
+    ${actionHTML}
+    <div class="bc-inline-comments">
+      <div class="bc-com-hdr"><div class="bc-com-title">COMMENTS</div><div class="bc-com-count" id="bc-cc-${chalId}">${fmtN(d.comments||0)}</div></div>
+      <div class="bc-com-input-row">
+        <div class="bc-com-av">${CUD.photoURL?`<img src="${CUD.photoURL}"/>`:(CUD.displayName||'?').charAt(0).toUpperCase()}</div>
+        <div class="bc-com-wrap"><input type="text" id="bc-ci-${chalId}" placeholder="Comment on this battle..." maxlength="200" oninput="document.getElementById('bc-cs-${chalId}').disabled=!this.value.trim()"/><button id="bc-cs-${chalId}" class="bc-com-send" disabled onclick="submitBcComment('${chalId}','bc-ci-${chalId}','bc-cp-${chalId}')"><i class="fa-solid fa-paper-plane"></i></button></div>
+      </div>
+      <div class="bc-com-preview" id="bc-cp-${chalId}"></div>
+      <div class="bc-see-all" onclick="openComments('challenges','${chalId}')">See all comments →</div>
+    </div>`;
+  // Check voted, load comments
+  setTimeout(()=>{
+    checkBattleVoted(chalId);
+    loadBcComments(chalId);
+  },100);
   return div;
 }
-// ═══════════════════════════════════════════
+
+let bcMuted=true;
+function playBcVid(playId,pauseId,chalId){
+  const pv=document.getElementById(playId+'-vid'),pav=document.getElementById(pauseId+'-vid');
+  const pt=document.getElementById(playId+'-thumb'),pi=document.getElementById(playId+'-pi'),pause=document.getElementById(playId+'-pause');
+  if(!pv)return;
+  if(pv.style.display==='none'||!pv.style.display){
+    if(pt)pt.style.display='none';
+    pv.style.display='block';pv.muted=bcMuted;pv.play().catch(()=>{});
+    if(pi)pi.classList.add('gone');
+    if(pav)pav.pause();
+    const grid=document.getElementById(`bc-grid-${chalId}`);
+    if(grid){grid.classList.remove('cr-big','ce-big');grid.classList.add(playId==='bc-cr'?'cr-big':'ce-big');}
+  }else{
+    if(pv.paused){pv.play().catch(()=>{});if(pi)pi.classList.add('gone');if(pause)flashEl(pause);}
+    else{pv.pause();if(pi)pi.classList.remove('gone');if(pause)flashEl(pause);}
+    if(pav&&!pav.paused)pav.pause();
+  }
+}
+function toggleBcMute(e){
+  e.stopPropagation();bcMuted=!bcMuted;
+  document.querySelectorAll('[id$="-vid"]').forEach(v=>{if(v.tagName==='VIDEO')v.muted=bcMuted;});
+  document.querySelectorAll('.bc-mute-btn i').forEach(i=>i.className=`fa-solid ${bcMuted?'fa-volume-xmark':'fa-volume-high'}`);
+}
+
+async function voteBattle(chalId,side,btn){
+  const ref=db.collection('challengeVotes').doc(`${CU.uid}_${chalId}`);
+  const snap=await ref.get();
+  if(snap.exists){showToast('Already voted!');return;}
+  await ref.set({chalId,userId:CU.uid,side,createdAt:ts()});
+  const upd=side==='challenger'?{challengerVotes:firebase.firestore.FieldValue.increment(1),totalVotes:firebase.firestore.FieldValue.increment(1)}:{challengeeVotes:firebase.firestore.FieldValue.increment(1),totalVotes:firebase.firestore.FieldValue.increment(1)};
+  await db.collection('challenges').doc(chalId).update(upd);
+  btn.classList.add('voted');btn.textContent='✓ Voted!';btn.disabled=true;
+  document.querySelectorAll(`#bc-va-${chalId},#bc-vb-${chalId}`).forEach(b=>b.disabled=true);
+  showToast('✓ Vote counted!');
+}
+async function checkBattleVoted(chalId){
+  const snap=await db.collection('challengeVotes').doc(`${CU.uid}_${chalId}`).get();
+  if(!snap.exists)return;
+  const side=snap.data().side;
+  const btnA=document.getElementById(`bc-va-${chalId}`),btnB=document.getElementById(`bc-vb-${chalId}`);
+  if(btnA){btnA.disabled=true;if(side==='challenger'){btnA.classList.add('voted');btnA.textContent='✓ Your Vote';}}
+  if(btnB){btnB.disabled=true;if(side==='challengee'){btnB.classList.add('voted');btnB.textContent='✓ Your Vote';}}
+}
+async function submitBcComment(chalId,inputId,previewId){
+  const input=document.getElementById(inputId);if(!input)return;
+  const text=input.value.trim();if(!text)return;
+  input.value='';document.getElementById(`bc-cs-${chalId}`).disabled=true;
+  await db.collection('challenges').doc(chalId).collection('comments').add({authorId:CU.uid,authorName:CUD.displayName,authorUsername:CUD.username,authorPhoto:CUD.photoURL||null,text,createdAt:ts()});
+  await db.collection('challenges').doc(chalId).update({comments:firebase.firestore.FieldValue.increment(1)});
+  loadBcComments(chalId);
+}
+function loadBcComments(chalId){
+  const el=document.getElementById(`bc-cp-${chalId}`);if(!el)return;
+  db.collection('challenges').doc(chalId).collection('comments').orderBy('createdAt','desc').limit(2).onSnapshot(snap=>{
+    el.innerHTML='';
+    snap.forEach(doc=>{const d=doc.data();const item=document.createElement('div');item.className='bc-com-item';const av=d.authorPhoto?`<div class="bc-com-item-av"><img src="${d.authorPhoto}"/></div>`:`<div class="bc-com-item-av">${(d.authorName||'?').charAt(0).toUpperCase()}</div>`;item.innerHTML=`${av}<div><div class="bc-com-item-un">${esc(d.authorUsername||'')}</div><div class="bc-com-item-txt">${esc(d.text)}</div></div>`;el.appendChild(item);});
+  });
+}
+
+function viewBattle(chalId){
+  closeModal('chal-vote-modal');
+  showScr('challenges');
+  // Switch to battles tab and scroll to that challenge
+  document.querySelectorAll('.ctab').forEach(t=>{if(t.dataset.t==='battles'){t.click();}});
+  setTimeout(()=>{
+    const card=document.querySelector(`[data-chal-id="${chalId}"],.battle-card`);
+    if(card)card.scrollIntoView({behavior:'smooth'});
+  },500);
+}
+
+// ── COMMUNITY ──
+function initCommunity(){
+  const body=document.getElementById('chal-body');
+  const wrap=document.createElement('div');wrap.className='community-list';body.innerHTML='';body.appendChild(wrap);
+  const q=db.collection('challenges').where('type','==','community').orderBy('createdAt','desc').limit(30);
+  chalUnsub=q.onSnapshot(snap=>{
+    wrap.innerHTML='';
+    if(snap.empty){wrap.innerHTML=`<div class="empty"><i class="fa-solid fa-trophy"></i><p>No community challenges yet.</p><button class="btn-or" onclick="showScr('create-community')"><i class="fa-solid fa-plus"></i> Create First Challenge</button></div>`;return;}
+    snap.forEach(doc=>{wrap.appendChild(buildCCCard(doc.id,doc.data()));});
+  });
+}
+function buildCCCard(id,d){
+  const div=document.createElement('div');div.className='cc-card';
+  div.innerHTML=`<div class="cc-card-top"><div class="cc-card-type"><i class="fa-solid fa-trophy"></i> COMMUNITY</div><div class="cc-card-badge">OPEN</div></div><div class="cc-card-name">${esc(d.name||'Challenge')}</div><div class="cc-card-meta"><span><i class="fa-solid fa-users"></i>${d.entryCount||0} entries</span><span><i class="fa-regular fa-thumbs-up"></i>${d.totalVotes||0} votes</span><span>by ${esc(d.creatorUsername||'')}</span></div>`;
+  div.onclick=()=>viewCommunityChallenge(id,d);
+  return div;
+}
+async function viewCommunityChallenge(id,d){
+  prevScr=curScr;curScr='join-community';
+  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('active'));
+  document.getElementById('scr-join-community').classList.add('active');
+  joinChalTarget={...d,chalId:id};
+  document.getElementById('joining-info').innerHTML=`<div class="jt">${esc(d.name)}</div><div class="jm">${d.entryCount||0} entries · by ${esc(d.creatorUsername||'')}</div>`;
+  loadMyPostsForPicker('join-existing','joinSel');
+}
+
+// ── LEADERBOARD ──
+async function initLeaderboard(){
+  const body=document.getElementById('chal-body');
+  const wrap=document.createElement('div');wrap.className='leaderboard-wrap';body.innerHTML='';body.appendChild(wrap);
+  wrap.innerHTML='<div class="loading"><div class="spin dark"></div><span>Loading leaderboard...</span></div>';
+  try{
+    const snap=await db.collection('users').orderBy('challengeWins','desc').limit(50).get();
+    if(snap.empty){wrap.innerHTML='<div class="empty"><i class="fa-solid fa-chart-bar"></i><p>No rankings yet. Win a challenge to appear here.</p></div>';return;}
+    wrap.innerHTML=`<div class="lb-header"><h3>🏆 Comedy Leaderboard</h3><p>RANKED BY CHALLENGE WINS</p></div>`;
+    snap.docs.forEach((doc,i)=>{
+      const u=doc.data();const lv=getLevel(u);
+      const badges=computeBadges(u);
+      const rankClass=i===0?'top1':i===1?'top2':i===2?'top3':'';
+      const rankLabel=i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1).toString();
+      const row=document.createElement('div');row.className=`lb-row ${rankClass}`;
+      const avHTML=u.photoURL?`<div class="lb-av"><img src="${u.photoURL}"/></div>`:`<div class="lb-av">${(u.displayName||'?').charAt(0).toUpperCase()}</div>`;
+      const trend=u.challengeWins>u.challengeLosses?'up':u.challengeWins<u.challengeLosses?'dn':'sm';
+      const trendIcon=trend==='up'?'↑':trend==='dn'?'↓':'—';
+      row.innerHTML=`<div class="lb-rank ${i<3?['rk1','rk2','rk3'][i]:'rkn'}">${rankLabel}</div>${avHTML}<div class="lb-info"><div class="lb-name">${esc(u.displayName||'')}</div><div class="lb-user">${esc((u.username||'').split('@')[0])}<span>@comedy</span></div><div class="lb-badges">${renderBadges(badges)}<span class="badge-pill ${i<3?['badge-unbeaten','badge-defender','badge-rising'][i]:'badge-veteran'}" style="font-size:7px;">${lv.name.toUpperCase()}</span></div></div><div class="lb-right"><div class="lb-wins">${u.challengeWins||0}</div><div class="lb-wins-lbl">WINS</div><div class="lb-trend ${trend}">${trendIcon} ${Math.abs((u.challengeWins||0)-(u.challengeLosses||0))}</div></div>`;
+      row.onclick=()=>viewProfile(u.uid);
+      wrap.appendChild(row);
+    });
+  }catch(e){wrap.innerHTML='<div class="empty"><i class="fa-solid fa-database"></i><p>Setting up leaderboard index... Check Firebase console.</p></div>';}
+}
+
+// ─────────────────────────────────────────────
+// COMMUNITY CHALLENGE CREATION
+// ─────────────────────────────────────────────
+function prevCCMedia(input){const f=input.files[0];if(!f)return;ccMediaFile=f;showMPrev(f,'cc-media-prev',null);}
+async function submitCC(){
+  const name=document.getElementById('cc-name').value.trim();
+  const desc=document.getElementById('cc-desc').value.trim();
+  const cap=document.getElementById('cc-cap').value.trim();
+  const err=document.getElementById('cc-err');
+  err.classList.add('hidden');
+  if(!name){showErr(err,'Give the challenge a name.');return;}
+  if(!cap&&!ccMediaFile){showErr(err,'Add your first entry post.');return;}
+  const btn=document.querySelector('#scr-create-community .btn-or');
+  setBtnLoad(btn,true);
+  try{
+    let mURL=null,mType=null,tURL=null;
+    if(ccMediaFile){showToast('Uploading...');const res=await uploadWithThumb(ccMediaFile,`posts/${CU.uid}`);mURL=res.url;mType=res.type;tURL=res.thumbURL;}
+    const pRef=await db.collection('posts').add({authorId:CU.uid,authorName:CUD.displayName,authorUsername:CUD.username,authorPhoto:CUD.photoURL||null,caption:cap,niche:'comedy',mediaURL:mURL,mediaType:mType,thumbURL:tURL,likes:0,comments:0,giftClicks:0,createdAt:ts()});
+    await db.collection('users').doc(CU.uid).update({postCount:firebase.firestore.FieldValue.increment(1)});
+    CUD.postCount=(CUD.postCount||0)+1;
+    const cRef=await db.collection('challenges').add({type:'community',name,description:desc,niche:'comedy',creatorId:CU.uid,creatorUsername:CUD.username,creatorName:CUD.displayName,entryCount:1,totalVotes:0,comments:0,participants:[CU.uid],createdAt:ts()});
+    await db.collection('challengeEntries').add({chalId:cRef.id,postId:pRef.id,authorId:CU.uid,authorName:CUD.displayName,authorUsername:CUD.username,authorPhoto:CUD.photoURL||null,caption:cap,mediaURL:mURL,mediaType:mType,thumbURL:tURL,votes:0,createdAt:ts()});
+    document.getElementById('cc-name').value='';document.getElementById('cc-desc').value='';document.getElementById('cc-cap').value='';
+    clearMPrev('cc-media-prev',null);ccMediaFile=null;
+    showToast('🏆 Challenge launched!');showScr('challenges');
+  }catch(e){showErr(err,e.message);}
+  setBtnLoad(btn,false,'<i class="fa-solid fa-flag"></i> <span>Launch Challenge</span>');
+}
+
+// Join community challenge
+function prevJoinMedia(input){const f=input.files[0];if(!f)return;joinMediaFile=f;showMPrev(f,'jn-media-prev',null);}
+async function submitJoin(){
+  if(!joinChalTarget)return;
+  const isNew=!document.getElementById('join-new').classList.contains('hidden');
+  const err=document.getElementById('join-err');
+  err.classList.add('hidden');
+  if(!isNew&&!joinSelPost){showErr(err,'Select a post or create a new one.');return;}
+  const btn=document.querySelector('#scr-join-community .btn-or');
+  setBtnLoad(btn,true);
+  try{
+    let postId,cap,mURL,mType,tURL;
+    if(isNew){
+      cap=document.getElementById('jn-cap').value.trim();
+      if(!cap&&!joinMediaFile){showErr(err,'Add caption or media.');setBtnLoad(btn,false,'<i class="fa-solid fa-shield-halved"></i> <span>Submit Entry</span>');return;}
+      if(joinMediaFile){showToast('Uploading...');const res=await uploadWithThumb(joinMediaFile,`posts/${CU.uid}`);mURL=res.url;mType=res.type;tURL=res.thumbURL;}
+      const pRef=await db.collection('posts').add({authorId:CU.uid,authorName:CUD.displayName,authorUsername:CUD.username,authorPhoto:CUD.photoURL||null,caption:cap,niche:'comedy',mediaURL:mURL||null,mediaType:mType||null,thumbURL:tURL||null,likes:0,comments:0,giftClicks:0,createdAt:ts()});
+      await db.collection('users').doc(CU.uid).update({postCount:firebase.firestore.FieldValue.increment(1)});
+      CUD.postCount=(CUD.postCount||0)+1;postId=pRef.id;
+    }else{postId=joinSelPost.postId;cap=joinSelPost.caption;mURL=joinSelPost.mediaURL;mType=joinSelPost.mediaType;tURL=joinSelPost.thumbURL;}
+    await db.collection('challengeEntries').add({chalId:joinChalTarget.chalId,postId,authorId:CU.uid,authorName:CUD.displayName,authorUsername:CUD.username,authorPhoto:CUD.photoURL||null,caption:cap||'',mediaURL:mURL||null,mediaType:mType||null,thumbURL:tURL||null,votes:0,createdAt:ts()});
+    await db.collection('challenges').doc(joinChalTarget.chalId).update({entryCount:firebase.firestore.FieldValue.increment(1),participants:firebase.firestore.FieldValue.arrayUnion(CU.uid)});
+    showToast('Entry submitted!');joinChalTarget=null;joinSelPost=null;joinMediaFile=null;showScr('challenges');
+  }catch(e){showErr(err,e.message);}
+  setBtnLoad(btn,false,'<i class="fa-solid fa-shield-halved"></i> <span>Submit Entry</span>');
+}
+
+// ─────────────────────────────────────────────
+// POST CREATION
+// ─────────────────────────────────────────────
+function prevPostMedia(input){const f=input.files[0];if(!f)return;postMediaFile=f;showMPrev(f,'pmedia-prev','mdrop');}
+function showMPrev(file,prevId,dropId){
+  const prev=document.getElementById(prevId);if(!prev)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const isVid=file.type.startsWith('video/');
+    prev.innerHTML=`<div class="mprev">${isVid?`<video src="${e.target.result}" controls style="width:100%;max-height:230px;object-fit:cover;display:block;"></video>`:`<img src="${e.target.result}" style="width:100%;max-height:230px;object-fit:cover;display:block;"/>`}<button class="rm-media" onclick="clearMPrev('${prevId}','${dropId}')"><i class="fa-solid fa-xmark"></i></button></div>`;
+    prev.classList.remove('hidden');if(dropId)document.getElementById(dropId)?.classList.add('hidden');
+  };reader.readAsDataURL(file);
+}
+function clearMPrev(prevId,dropId){
+  const prev=document.getElementById(prevId);if(prev){prev.classList.add('hidden');prev.innerHTML='';}
+  if(dropId)document.getElementById(dropId)?.classList.remove('hidden');
+  postMediaFile=null;c1MediaFile=null;ccMediaFile=null;joinMediaFile=null;
+}
+async function doPost(){
+  const cap=document.getElementById('pcap').value.trim();
+  const err=document.getElementById('post-err');err.classList.add('hidden');
+  if(!cap&&!postMediaFile){showErr(err,'Write something or add media.');return;}
+  const btn=document.querySelector('#scr-post .btn-or');setBtnLoad(btn,true);
+  try{
+    let mURL=null,mType=null,tURL=null;
+    if(postMediaFile){showToast('Uploading...');const res=await uploadWithThumb(postMediaFile,`posts/${CU.uid}`);mURL=res.url;mType=res.type;tURL=res.thumbURL;}
+    await db.collection('posts').add({authorId:CU.uid,authorName:CUD.displayName,authorUsername:CUD.username,authorPhoto:CUD.photoURL||null,caption:cap,niche:'comedy',mediaURL:mURL,mediaType:mType,thumbURL:tURL,likes:0,comments:0,giftClicks:0,createdAt:ts()});
+    await db.collection('users').doc(CU.uid).update({postCount:firebase.firestore.FieldValue.increment(1)});
+    CUD.postCount=(CUD.postCount||0)+1;
+    document.getElementById('pcap').value='';document.getElementById('pcnt').textContent='0/300';
+    clearMPrev('pmedia-prev','mdrop');postMediaFile=null;
+    showToast('🔥 Post published!');showScr('feed');
+  }catch(e){showErr(err,e.message);}
+  setBtnLoad(btn,false,'<span>Publish</span><i class="fa-solid fa-paper-plane"></i>');
+}
+
+// ─────────────────────────────────────────────
 // GIFT
-// ═══════════════════════════════════════════
-let giftAmount = 0;
-function openGiftModal(postId, authorId, authorUsername) {
-  giftTarget={postId,authorId,authorUsername};giftAmount=0;
+// ─────────────────────────────────────────────
+function openGiftModal(postId,authorId,authorUsername){
+  giftTarget={postId,authorId,authorUsername};giftAmt=0;
   document.querySelectorAll('.gopt').forEach(o=>o.classList.remove('sel'));
   document.getElementById('gift-to').innerHTML=`Gifting <span>${esc(authorUsername)}</span>`;
   document.getElementById('gift-modal').classList.remove('hidden');
 }
-function pickGift(el,amt){
-  document.querySelectorAll('.gopt').forEach(o=>o.classList.remove('sel'));
-  el.classList.add('sel'); giftAmount=amt;
-}
-function closeModal(id){document.getElementById(id).classList.add('hidden');}
-async function sendGift() {
-  if (!giftAmount){showToast('Pick a gift amount.');return;}
-  if (!giftTarget){return;}
+function pickGift(el,amt){document.querySelectorAll('.gopt').forEach(o=>o.classList.remove('sel'));el.classList.add('sel');giftAmt=amt;}
+async function sendGift(){
+  if(!giftAmt){showToast('Pick an amount first.');return;}
+  if(!giftTarget)return;
   closeModal('gift-modal');
   await db.collection('posts').doc(giftTarget.postId).update({giftClicks:firebase.firestore.FieldValue.increment(1)});
   await db.collection('users').doc(giftTarget.authorId).update({giftClicksReceived:firebase.firestore.FieldValue.increment(1)});
-  await db.collection('giftClicks').add({postId:giftTarget.postId,authorId:giftTarget.authorId,clickerUid:CU.uid,clickerUsername:CUD.username,amount:giftAmount,createdAt:ts()});
-  if (giftTarget.authorId!==CU.uid) addNotif(giftTarget.authorId,'gift',`${CUD.username} would gift you ${giftAmount} coins! Real Mobile Money gifting in V1.`,'posts',giftTarget.postId);
-  const el=document.getElementById(`gift-cnt-${giftTarget.postId}`);
-  if(el){const n=parseInt(el.textContent.replace(/[^0-9]/g,''))||0;el.textContent=fmtN(n+1);}
-  // Coin animation
-  for(let i=0;i<4;i++){
-    const c=document.createElement('div');
-    c.style.cssText=`position:fixed;z-index:9999;font-size:22px;right:${50+Math.random()*40}px;bottom:${150+Math.random()*60}px;animation:coinPop 1.1s ease forwards;animation-delay:${i*.12}s;pointer-events:none;`;
-    c.textContent='🪙';document.body.appendChild(c);setTimeout(()=>c.remove(),1500);
-  }
-  showToast(`🪙 ${giftAmount} coin gift intent sent! Tracked.`);
-  giftTarget=null;giftAmount=0;
+  await db.collection('giftClicks').add({postId:giftTarget.postId,authorId:giftTarget.authorId,clickerUid:CU.uid,clickerUsername:CUD.username,amount:giftAmt,createdAt:ts()});
+  if(giftTarget.authorId!==CU.uid)addNotif(giftTarget.authorId,'gift',`${CUD.username} would gift you ${giftAmt} coins — Mobile Money gifting in V1!`,'posts',giftTarget.postId);
+  for(let i=0;i<4;i++){const c=document.createElement('div');c.style.cssText=`position:fixed;z-index:9999;font-size:22px;right:${50+Math.random()*40}px;bottom:${150+Math.random()*60}px;animation:coinPop 1.1s ease forwards;animation-delay:${i*.12}s;pointer-events:none;`;c.textContent='🪙';document.body.appendChild(c);setTimeout(()=>c.remove(),1500);}
+  const el=document.getElementById(`tk-gift-cnt-${giftTarget.postId}`);if(el){const n=parseInt(el.textContent.replace(/[^0-9]/g,''))||0;el.textContent=fmtN(n+1);}
+  showToast(`🪙 ${giftAmt} coin gift intent sent!`);
+  giftTarget=null;giftAmt=0;
 }
 
-// ═══════════════════════════════════════════
-// NOTIFICATIONS
-// ═══════════════════════════════════════════
-function listenNotifs() {
-  if (notifUnsub) notifUnsub();
-  notifUnsub = db.collection('notifications').where('toUid','==',CU.uid).where('read','==',false)
-    .onSnapshot(snap => {
-      const dot = document.getElementById('notif-dot');
-      if (snap.size>0){dot.classList.remove('hidden');}else{dot.classList.add('hidden');}
-    });
+// ─────────────────────────────────────────────
+// COMMENTS SHEET
+// ─────────────────────────────────────────────
+function openComments(collection,docId){
+  comTarget={collection,docId};
+  const overlay=document.getElementById('cs-overlay');overlay.classList.remove('hidden');
+  document.body.style.overflow='hidden';
+  const av=document.getElementById('cs-av');
+  av.innerHTML=CUD.photoURL?`<img src="${CUD.photoURL}"/>`:(CUD.displayName||'?').charAt(0).toUpperCase();
+  document.getElementById('cs-text').value='';
+  document.getElementById('cs-send').disabled=true;
+  loadComments();
 }
-
-async function initNotifs() {
-  const list = document.getElementById('notif-list');
-  list.innerHTML='<div class="loading-state"><div class="spin dark"></div><span>Loading...</span></div>';
-  const snap = await db.collection('notifications').where('toUid','==',CU.uid).orderBy('createdAt','desc').limit(30).get();
-  if (snap.empty){list.innerHTML='<div class="notif-empty"><i class="fa-regular fa-bell"></i><p>No notifications yet.</p></div>';return;}
-  list.innerHTML='';
-  const batch=db.batch();
-  snap.forEach(doc=>{
-    const d=doc.data();
-    const iconMap={gift:'fa-solid fa-coins',chal:'fa-solid fa-shield-halved',like:'fa-solid fa-heart',follow:'fa-solid fa-user-plus'};
-    const item=document.createElement('div');
-    item.className=`ni-item${d.read?'':' unread'}`;
-    item.innerHTML=`<div class="ni-ico ${d.type||'like'}"><i class="${iconMap[d.type]||'fa-solid fa-bell'}"></i></div><div class="ni-txt"><p>${esc(d.message)}</p></div><div class="ni-time">${d.createdAt?timeAgo(d.createdAt.toDate()):'now'}</div>`;
-    list.appendChild(item);
-    if(!d.read)batch.update(doc.ref,{read:true});
+function closeComments(){
+  comTarget=null;if(comUnsub){comUnsub();comUnsub=null;}
+  document.getElementById('cs-overlay').classList.add('hidden');
+  document.body.style.overflow='';
+}
+function loadComments(){
+  const list=document.getElementById('cs-list');
+  list.innerHTML='<div class="loading"><div class="spin dark"></div></div>';
+  if(comUnsub)comUnsub();
+  if(!comTarget)return;
+  comUnsub=db.collection(comTarget.collection).doc(comTarget.docId).collection('comments').orderBy('createdAt','asc').onSnapshot(snap=>{
+    const count=document.getElementById('cs-count');if(count)count.textContent=snap.size>0?`(${snap.size})`:'';
+    if(snap.empty){list.innerHTML='<div class="empty" style="padding:30px;"><i class="fa-regular fa-comment-dots"></i><p>No comments yet. Be first!</p></div>';return;}
+    list.innerHTML='';
+    snap.forEach(doc=>list.appendChild(buildComment(doc.data(),doc.id,comTarget.collection,comTarget.docId)));
+    list.scrollTop=list.scrollHeight;
   });
-  await batch.commit();
-  document.getElementById('notif-dot').classList.add('hidden');
+}
+async function submitComment(){
+  const input=document.getElementById('cs-text');const text=input.value.trim();if(!text||!comTarget)return;
+  input.value='';document.getElementById('cs-send').disabled=true;
+  await db.collection(comTarget.collection).doc(comTarget.docId).collection('comments').add({authorId:CU.uid,authorName:CUD.displayName,authorUsername:CUD.username,authorPhoto:CUD.photoURL||null,text,createdAt:ts()});
+  if(comTarget.collection==='posts')await db.collection('posts').doc(comTarget.docId).update({comments:firebase.firestore.FieldValue.increment(1)});
+}
+function buildComment(d,commentId,collection,docId){
+  const div=document.createElement('div');div.className='com-item';
+  const av=d.authorPhoto?`<div class="com-av"><img src="${d.authorPhoto}"/></div>`:`<div class="com-av">${(d.authorName||'?').charAt(0).toUpperCase()}</div>`;
+  div.innerHTML=`${av}<div class="com-body"><div class="com-hdr"><span class="com-name">${esc(d.authorName)}</span><span class="com-un">${esc(d.authorUsername||'')}</span><span class="com-time">${d.createdAt?timeAgo(d.createdAt.toDate()):'now'}</span></div><div class="com-text">${esc(d.text)}</div><div class="com-foot"><button class="com-like-btn" id="cl-${commentId}" onclick="likeComment('${collection}','${docId}','${commentId}',this)"><i class="fa-regular fa-heart"></i><span id="clc-${commentId}">${d.likes||0}</span></button><button class="com-reply-btn" onclick="toggleReply('${commentId}','${esc(d.authorUsername||'')}','${collection}','${docId}')"><i class="fa-solid fa-reply"></i> Reply</button></div><div class="reply-input-wrap hidden" id="ri-${commentId}"><div class="reply-input-row"><div class="com-av-sm" style="width:22px;height:22px;">${CUD.photoURL?`<img src="${CUD.photoURL}"/>`:(CUD.displayName||'?').charAt(0).toUpperCase()}</div><div class="com-iw"><input type="text" id="rit-${commentId}" placeholder="Reply to ${esc(d.authorUsername||'')}..." maxlength="200" oninput="document.getElementById('rsb-${commentId}').disabled=!this.value.trim()"/><button id="rsb-${commentId}" class="cs-send-btn" disabled onclick="submitReply('${collection}','${docId}','${commentId}','rit-${commentId}')"><i class="fa-solid fa-paper-plane"></i></button></div></div></div><div class="replies-list" id="rpl-${commentId}"></div></div>`;
+  // Check if user liked this comment
+  db.collection('commentLikes').doc(`${CU.uid}_${commentId}`).get().then(s=>{const btn=document.getElementById(`cl-${commentId}`);if(s.exists&&btn)btn.classList.add('liked');});
+  setTimeout(()=>loadReplies(collection,docId,commentId),100);
+  return div;
+}
+async function likeComment(collection,docId,commentId,btn){
+  const lid=`${CU.uid}_${commentId}`;const ref=db.collection('commentLikes').doc(lid);
+  const snap=await ref.get();const cnt=document.getElementById(`clc-${commentId}`);
+  if(snap.exists){await ref.delete();await db.collection(collection).doc(docId).collection('comments').doc(commentId).update({likes:firebase.firestore.FieldValue.increment(-1)});btn.classList.remove('liked');if(cnt)cnt.textContent=Math.max(0,parseInt(cnt.textContent||0)-1);}
+  else{await ref.set({commentId,userId:CU.uid,createdAt:ts()});await db.collection(collection).doc(docId).collection('comments').doc(commentId).update({likes:firebase.firestore.FieldValue.increment(1)});btn.classList.add('liked');if(cnt)cnt.textContent=parseInt(cnt.textContent||0)+1;}
+}
+function toggleReply(commentId,username,collection,docId){
+  document.querySelectorAll('.reply-input-wrap').forEach(w=>w.classList.add('hidden'));
+  const wrap=document.getElementById(`ri-${commentId}`);if(wrap){wrap.classList.remove('hidden');document.getElementById(`rit-${commentId}`)?.focus();}
+}
+async function submitReply(collection,docId,commentId,inputId){
+  const input=document.getElementById(inputId);if(!input)return;
+  const text=input.value.trim();if(!text)return;input.value='';
+  const btn=document.getElementById(inputId.replace('rit-','rsb-'));if(btn)btn.disabled=true;
+  await db.collection(collection).doc(docId).collection('comments').doc(commentId).collection('replies').add({authorId:CU.uid,authorName:CUD.displayName,authorUsername:CUD.username,authorPhoto:CUD.photoURL||null,text,createdAt:ts()});
+  await db.collection(collection).doc(docId).collection('comments').doc(commentId).update({replyCount:firebase.firestore.FieldValue.increment(1)});
+  if(collection==='posts')await db.collection('posts').doc(docId).update({comments:firebase.firestore.FieldValue.increment(1)});
+  document.getElementById(`ri-${commentId}`)?.classList.add('hidden');
+  loadReplies(collection,docId,commentId);
+}
+function loadReplies(collection,docId,commentId){
+  const list=document.getElementById(`rpl-${commentId}`);if(!list)return;
+  db.collection(collection).doc(docId).collection('comments').doc(commentId).collection('replies').orderBy('createdAt','asc').onSnapshot(snap=>{
+    if(snap.empty){list.innerHTML='';return;}list.innerHTML='';
+    snap.forEach(doc=>{const d=doc.data();const item=document.createElement('div');item.className='reply-item';const av=d.authorPhoto?`<div class="reply-av"><img src="${d.authorPhoto}"/></div>`:`<div class="reply-av">${(d.authorName||'?').charAt(0).toUpperCase()}</div>`;item.innerHTML=`${av}<div class="reply-body"><div class="com-hdr"><span class="com-name">${esc(d.authorName)}</span><span class="com-un">${esc(d.authorUsername||'')}</span><span class="com-time">${d.createdAt?timeAgo(d.createdAt.toDate()):'now'}</span></div><div class="com-text">${esc(d.text)}</div></div>`;list.appendChild(item);});
+  });
 }
 
+// ─────────────────────────────────────────────
+// SEARCH
+// ─────────────────────────────────────────────
+function openSearch(){document.getElementById('search-modal').classList.remove('hidden');setTimeout(()=>document.getElementById('search-input')?.focus(),100);}
+let searchTimeout=null;
+async function doSearch(val){
+  clearTimeout(searchTimeout);const list=document.getElementById('search-results');
+  if(!val||val.length<2){list.innerHTML='<div class="search-empty"><i class="fa-solid fa-magnifying-glass"></i><p>Search creators or captions...</p></div>';return;}
+  list.innerHTML='<div class="loading"><div class="spin dark"></div></div>';
+  searchTimeout=setTimeout(async()=>{
+    list.innerHTML='';const v=val.toLowerCase();const results=[];
+    // Search users
+    try{const uSnap=await db.collection('users').orderBy('username').startAt(v).endAt(v+'\uf8ff').limit(5).get();uSnap.forEach(doc=>{const d=doc.data();const item=document.createElement('div');item.className='sr-item';const av=d.photoURL?`<div class="sr-av"><img src="${d.photoURL}"/></div>`:`<div class="sr-av">${(d.displayName||'?').charAt(0).toUpperCase()}</div>`;item.innerHTML=`${av}<div class="sr-info"><div class="nm">${esc(d.displayName)}</div><div class="un">${esc(d.username||'')}</div></div><div class="sr-type">Creator</div>`;item.onclick=()=>{closeModal('search-modal');viewProfile(d.uid);};list.appendChild(item);});}catch(e){}
+    // Search posts by caption
+    try{const pSnap=await db.collection('posts').orderBy('caption').startAt(val).endAt(val+'\uf8ff').limit(5).get();pSnap.forEach(doc=>{const d=doc.data();const item=document.createElement('div');item.className='sr-item';const av=d.authorPhoto?`<div class="sr-av"><img src="${d.authorPhoto}"/></div>`:`<div class="sr-av">${(d.authorName||'?').charAt(0).toUpperCase()}</div>`;item.innerHTML=`${av}<div class="sr-info"><div class="nm">${esc(d.authorName||'')}</div><div class="un">${esc(d.authorUsername||'')}</div><div class="cap">${esc((d.caption||'').substring(0,60))}</div></div><div class="sr-type">Post</div>`;item.onclick=()=>closeModal('search-modal');list.appendChild(item);});}catch(e){}
+    if(!list.children.length)list.innerHTML='<div class="search-empty"><i class="fa-solid fa-magnifying-glass"></i><p>No results found.</p></div>';
+  },400);
+}
+
+// ─────────────────────────────────────────────
+// PROFILE
+// ─────────────────────────────────────────────
+async function initProfile(uid,isOwn,containerId){
+  const container=document.getElementById(containerId||'profile-body');
+  container.innerHTML='<div class="loading"><div class="spin dark"></div><span>Loading profile...</span></div>';
+  const snap=await db.collection('users').doc(uid).get();
+  if(!snap.exists){container.innerHTML='<div class="empty"><p>Profile not found.</p></div>';return;}
+  const u=snap.data();if(isOwn)CUD=u;
+  const lv=getLevel(u);const badges=computeBadges(u);
+  const postsSnap=await db.collection('posts').where('authorId','==',uid).orderBy('createdAt','desc').limit(12).get();
+  let gridHTML='';
+  postsSnap.forEach(doc=>{
+    const d=doc.data();
+    const thumb=d.thumbURL||d.mediaURL;
+    const mediaHTML=thumb?(d.mediaType==='video'?`<img src="${thumb}" style="width:100%;height:100%;object-fit:cover;"/><div class="pg-vid-badge"><i class="fa-solid fa-play"></i></div>`:`<img src="${d.mediaURL}" style="width:100%;height:100%;object-fit:cover;"/>`):`<div class="pg-placeholder">${esc((d.caption||'').substring(0,40))}</div>`;
+    gridHTML+=`<div class="pg-item" onclick="openPostFromProfile('${doc.id}','${uid}')">${mediaHTML}<div class="pg-ov"><span><i class="fa-solid fa-coins"></i>${d.giftClicks||0}</span></div></div>`;
+  });
+  const avHTML=u.photoURL?`<img src="${u.photoURL}"/>`:(u.displayName||'?').charAt(0).toUpperCase();
+  container.innerHTML=`
+    <div class="prof-cover"><div class="prof-cover-glow"></div><div class="prof-cover-grid"></div><div class="prof-av-wrap"><div class="prof-av">${avHTML}<div class="prof-av-ring"></div></div></div></div>
+    <div class="prof-body">
+      <div class="prof-name">${esc(u.displayName||'')}</div>
+      <div class="prof-urow"><span class="prof-user">${esc((u.username||'').split('@')[0])}<span>@comedy</span></span><div class="lvl-badge"><i class="fa-solid fa-arrow-up"></i>${lv.name}</div></div>
+      ${badges.length?`<div class="prof-badges">${renderBadges(badges)}</div>`:''}
+      ${u.bio?`<div class="prof-bio">${esc(u.bio)}</div>`:''}
+      <div class="prof-stats"><div class="ps"><div class="ps-v">${fmtN(u.postCount||0)}</div><div class="ps-l">Posts</div></div><div class="ps"><div class="ps-v">${fmtN(u.followers||0)}</div><div class="ps-l">Followers</div></div><div class="ps"><div class="ps-v or">${fmtN(u.challengeWins||0)}</div><div class="ps-l">Wins</div></div><div class="ps"><div class="ps-v go">${fmtN(u.giftClicksReceived||0)}</div><div class="ps-l">Gifts</div></div></div>
+      ${isOwn?`<div class="prof-acts"><button class="prof-edit-btn" onclick="showToast('Edit profile coming soon!')">Edit Profile</button></div>`:`<div class="prof-acts"><button class="prof-follow-btn" id="pf-btn-${uid}" onclick="toggleFollow('${uid}','',this)">Follow</button><button class="prof-chal-btn"><i class="fa-solid fa-shield-halved"></i> Challenge</button></div>`}
+      ${!isOwn?'':`<div class="prof-acts" style="margin-top:-8px;"><button class="btn-ghost w" onclick="auth.signOut()"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button></div>`}
+      <div class="prof-divider"></div>
+      <div class="prof-sec">Gift Intents</div>
+      <div class="gift-block"><div class="gb-ico"><i class="fa-solid fa-coins"></i></div><div><div class="gb-v">${fmtN(u.giftClicksReceived||0)}</div><div class="gb-l">Fans would have gifted · Mobile Money in V1</div></div></div>
+      <div class="prof-sec">Level Progress</div>
+      <div class="lvl-prog"><div class="lp-top"><div class="lp-name">${lv.name}</div>${lv.next?`<div class="lp-next">→ ${lv.next.name} at ${fmtN(lv.next.min)} pts</div>`:''}</div><div class="lp-bar"><div class="lp-fill" style="width:${lv.pct}%"></div></div><div class="lp-hint">${fmtN(lv.score)} pts · Post, win challenges and get gifts to level up</div></div>
+      <div class="prof-sec">Posts</div>
+      <div class="posts-grid">${gridHTML||'<div style="grid-column:1/-1;padding:30px;text-align:center;color:var(--mu);font-size:13px;">No posts yet.</div>'}</div>
+    </div>`;
+  if(!isOwn){
+    db.collection('follows').doc(`${CU.uid}_${uid}`).get().then(s=>{const btn=document.getElementById(`pf-btn-${uid}`);if(s.exists&&btn){btn.textContent='Following';btn.classList.add('flw');}});
+  }
+}
+
+async function viewProfile(uid){
+  if(uid===CU.uid){showScr('profile');return;}
+  prevScr=curScr;curScr='viewprofile';
+  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('active'));
+  document.getElementById('scr-viewprofile').classList.add('active');
+  await initProfile(uid,false,'viewprofile-body');
+}
+
+function openPostFromProfile(postId,authorId){
+  showScr('feed');
+  loadFeedFromAuthor(postId,authorId);
+}
+async function loadFeedFromAuthor(targetPostId,authorId){
+  const feed=document.getElementById('tk-feed');
+  feed.innerHTML=`<div class="tk-post"><div style="height:100%;display:flex;align-items:center;justify-content:center;"><div class="spin"></div></div></div>`;
+  if(feedUnsub)feedUnsub();if(feedObserver)feedObserver.disconnect();
+  const snap=await db.collection('posts').where('authorId','==',authorId).orderBy('createdAt','desc').limit(15).get();
+  const others=await db.collection('posts').orderBy('createdAt','desc').limit(10).get();
+  feed.innerHTML='';
+  let idx=0,targetEl=null;
+  const seen=new Set();
+  snap.forEach(doc=>{const el=buildTkPostSync(doc.id,doc.data(),idx);feed.appendChild(el);if(doc.id===targetPostId)targetEl=el;seen.add(doc.id);idx++;});
+  others.forEach(doc=>{if(!seen.has(doc.id)){feed.appendChild(buildTkPostSync(doc.id,doc.data(),idx));idx++;}});
+  setTimeout(()=>{setupObserver();if(targetEl)targetEl.scrollIntoView();},400);
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────
+function listenNotifs(){
+  if(notifUnsub)notifUnsub();
+  notifUnsub=db.collection('notifications').where('toUid','==',CU.uid).where('read','==',false).onSnapshot(snap=>{
+    document.getElementById('notif-dot').classList.toggle('hidden',snap.size===0);
+  });
+}
+async function initNotifs(){
+  const body=document.getElementById('notif-body');
+  body.innerHTML='<div class="loading"><div class="spin dark"></div></div>';
+  const snap=await db.collection('notifications').where('toUid','==',CU.uid).orderBy('createdAt','desc').limit(30).get();
+  if(snap.empty){body.innerHTML='<div class="notif-empty"><i class="fa-regular fa-bell"></i><p>No notifications yet.</p></div>';return;}
+  body.innerHTML='';const batch=db.batch();
+  const iconMap={gift:'fa-solid fa-coins',chal:'fa-solid fa-shield-halved',like:'fa-solid fa-heart',follow:'fa-solid fa-user-plus'};
+  snap.forEach(doc=>{
+    const d=doc.data();const item=document.createElement('div');item.className=`ni${d.read?'':' unread'}`;
+    const ico=d.type||'like';
+    item.innerHTML=`<div class="ni-ico ${ico}"><i class="${iconMap[ico]||'fa-solid fa-bell'}"></i></div><div class="ni-txt"><p>${esc(d.message||'')}</p></div><div class="ni-time">${d.createdAt?timeAgo(d.createdAt.toDate()):'now'}</div>`;
+    // If it's a challenge notification, navigate to respond
+    if(d.type==='chal'&&d.refId){item.onclick=()=>showRespondChallenge(d.refId);}
+    body.appendChild(item);if(!d.read)batch.update(doc.ref,{read:true});
+  });
+  await batch.commit();document.getElementById('notif-dot').classList.add('hidden');
+}
 async function addNotif(toUid,type,message,refCollection,refId){
   if(!toUid)return;
   await db.collection('notifications').add({toUid,type,message,refCollection,refId,read:false,createdAt:ts()});
+  // Try web push
+  sendPushNotif(toUid,message,type);
+}
+async function sendPushNotif(toUid,message,type){
+  // Store push token — in real implementation call your backend
+  // For now just a placeholder
+  console.log('Push would send to',toUid,':',message);
 }
 
-// ═══════════════════════════════════════════
+// ─────────────────────────────────────────────
+// PUSH NOTIFICATIONS
+// ─────────────────────────────────────────────
+async function registerSW(){
+  if('serviceWorker' in navigator){
+    try{await navigator.serviceWorker.register('sw.js');}catch(e){console.log('SW registration failed:',e);}
+  }
+}
+async function requestPushPermission(){
+  if(!('Notification' in window))return;
+  if(Notification.permission==='default'){
+    const perm=await Notification.requestPermission();
+    if(perm==='granted'){showToast('🔔 Notifications enabled!');}
+  }
+}
+
+// ─────────────────────────────────────────────
+// TOOLTIPS
+// ─────────────────────────────────────────────
+function startTips(){
+  const seen=localStorage.getItem('ms_tips_done');
+  if(seen)return;
+  tipIndex=0;showTip();
+}
+function showTip(){
+  if(tipIndex>=TIPS.length){endTips();return;}
+  const tip=TIPS[tipIndex];
+  const overlay=document.getElementById('tooltip-overlay');
+  const bubble=document.getElementById('tooltip-bubble');
+  const content=document.getElementById('tt-content');
+  const step=document.getElementById('tt-step');
+  overlay.classList.remove('hidden');
+  content.innerHTML=`<h4>${tip.title}</h4><p>${tip.body}</p>`;
+  step.textContent=`${tipIndex+1} of ${TIPS.length}`;
+  // Position bubble
+  bubble.style.left=tip.x;bubble.style.top=tip.y;bubble.style.transform='translate(-50%,-50%)';
+  // Arrow direction
+  const arrow=document.getElementById('tt-arrow');
+  arrow.style.cssText='position:absolute;width:12px;height:12px;background:var(--wh);transform:rotate(45deg);';
+  if(tip.side==='left'){arrow.style.right='-6px';arrow.style.top='50%';arrow.style.marginTop='-6px';}
+  else if(tip.side==='top'){arrow.style.bottom='-6px';arrow.style.left='50%';arrow.style.marginLeft='-6px';}
+  else{arrow.style.top='-6px';arrow.style.left='50%';arrow.style.marginLeft='-6px';}
+}
+function nextTip(){tipIndex++;showTip();}
+function endTips(){document.getElementById('tooltip-overlay').classList.add('hidden');localStorage.setItem('ms_tips_done','1');}
+
+// ─────────────────────────────────────────────
+// BADGES UPDATE
+// ─────────────────────────────────────────────
+async function updateBadges(uid){
+  const snap=await db.collection('users').doc(uid).get();
+  if(!snap.exists)return;
+  const badges=computeBadges(snap.data());
+  await db.collection('users').doc(uid).update({badges});
+}
+
+// ─────────────────────────────────────────────
+// MODAL
+// ─────────────────────────────────────────────
+function closeModal(id){const el=document.getElementById(id);if(el)el.classList.add('hidden');}
+document.addEventListener('click',e=>{if(e.target.classList.contains('modal-overlay')||e.target.classList.contains('cs-backdrop')){e.target.closest('.modal-overlay,.cs-overlay')?.classList.add('hidden');document.body.style.overflow='';comTarget=null;}});
+
+// ─────────────────────────────────────────────
 // UTILS
-// ═══════════════════════════════════════════
+// ─────────────────────────────────────────────
 function ts(){return firebase.firestore.FieldValue.serverTimestamp();}
-function cap(str){return str?str.charAt(0).toUpperCase()+str.slice(1):'';}
-function esc(str){if(!str)return'';return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fmtN(n){n=parseInt(n)||0;if(n>=1000000)return(n/1000000).toFixed(1)+'M';if(n>=1000)return(n/1000).toFixed(1)+'K';return String(n);}
-function timeAgo(date){
-  const s=Math.floor((Date.now()-date)/1000);
-  if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m';
-  if(s<86400)return Math.floor(s/3600)+'h';if(s<604800)return Math.floor(s/86400)+'d';
-  return date.toLocaleDateString();
-}
-function timeLeft(date){
-  const s=Math.max(0,Math.floor((date-Date.now())/1000));
-  if(s<60)return s+'s left';if(s<3600)return Math.floor(s/60)+'m left';
-  if(s<86400)return Math.floor(s/3600)+'h left';return Math.floor(s/86400)+'d left';
-}
-function showToast(msg){
-  const old=document.getElementById('toast');if(old)old.remove();
-  const t=document.createElement('div');t.className='toast';t.id='toast';t.textContent=msg;
-  document.body.appendChild(t);setTimeout(()=>t.remove(),3200);
-}
-function setBtnLoading(btn,loading,resetHTML){
-  if(loading){btn.innerHTML='<div class="spin" style="width:16px;height:16px;border-color:rgba(255,255,255,.3);border-top-color:#fff;margin:0 auto;"></div>';btn.disabled=true;}
-  else{btn.innerHTML=resetHTML||btn.innerHTML;btn.disabled=false;}
-}
-// Close modals on bg click
-document.addEventListener('click',e=>{
-  if(e.target.id==='gift-modal')closeModal('gift-modal');
-});
-// Add coinPop animation dynamically
-const style=document.createElement('style');
-style.textContent='@keyframes coinPop{0%{opacity:1;transform:scale(1) translateY(0);}100%{opacity:0;transform:scale(.7) translateY(-100px);}}';
-document.head.appendChild(style);
-
-// ── CHALLENGE VIDEO CONTROLS ──
-let chalMuted = true;
-
-function initChalVideos() {
-  const crVid = document.getElementById('cr-video');
-  const ceVid = document.getElementById('ce-video');
-  if (!crVid && !ceVid) return;
-  // Autoplay first video
-  if (crVid) {
-    crVid.muted = true;
-    crVid.play().catch(() => {});
-    setChalActive('cr');
-  }
-  // Pause second
-  if (ceVid) {
-    ceVid.muted = true;
-    ceVid.pause();
-  }
-}
-
-function toggleChalVideo(playId, pauseId) {
-  const playVid = document.getElementById(playId + '-video');
-  const pauseVid = document.getElementById(pauseId + '-video');
-  const playInd = document.getElementById(playId + '-indicator');
-  const pauseInd = document.getElementById(pauseId + '-indicator');
-  if (!playVid) return;
-  if (playVid.paused) {
-    // Resume tapped video, pause the other
-    playVid.play().catch(() => {});
-    if (pauseVid) pauseVid.pause();
-    setChalActive(playId);
-    if (playInd) { playInd.querySelector('i').className = 'fa-solid fa-pause'; flashIndicator(playInd); }
-  } else {
-    // Pause tapped video, play the other
-    playVid.pause();
-    if (pauseVid) { pauseVid.play().catch(() => {}); setChalActive(pauseId); }
-    if (playInd) { playInd.querySelector('i').className = 'fa-solid fa-pause'; flashIndicator(playInd); }
-  }
-}
-
-function switchChalVideo(nextId) {
-  // Called when a video ends — play the other one
-  const nextVid = document.getElementById(nextId + '-video');
-  const otherId = nextId === 'cr' ? 'ce' : 'cr';
-  const otherVid = document.getElementById(otherId + '-video');
-  if (nextVid) {
-    nextVid.muted = chalMuted;
-    nextVid.play().catch(() => {});
-    setChalActive(nextId);
-  }
-  if (otherVid) otherVid.pause();
-}
-
-function setChalActive(activeId) {
-  const posts = document.querySelector('.v1v1-posts');
-  if (!posts) return;
-  posts.classList.remove('cr-active', 'ce-active');
-  posts.classList.add(activeId + '-active');
-}
-
-function toggleChalMute(e) {
-  e.stopPropagation();
-  chalMuted = !chalMuted;
-  const crVid = document.getElementById('cr-video');
-  const ceVid = document.getElementById('ce-video');
-  if (crVid) crVid.muted = chalMuted;
-  if (ceVid) ceVid.muted = chalMuted;
-  document.querySelectorAll('.chal-mute-btn i').forEach(i => {
-    i.className = `fa-solid ${chalMuted ? 'fa-volume-xmark' : 'fa-volume-high'}`;
-  });
-}
-
-function flashIndicator(el) {
-  el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 700);
-}
-
-// ── REPLIES ──
-function toggleReplyBox(commentId, username, collection, docId) {
-  const wrap = document.getElementById(`ri-${commentId}`);
-  if (!wrap) return;
-  const isHidden = wrap.classList.contains('hidden');
-  // Close all other open reply boxes first
-  document.querySelectorAll('.reply-input-wrap').forEach(w => w.classList.add('hidden'));
-  if (isHidden) {
-    wrap.classList.remove('hidden');
-    const input = document.getElementById(`rit-${commentId}`);
-    if (input) input.focus();
-  }
-}
-
-async function submitReply(collection, docId, commentId, inputId, repliesListId) {
-  const input = document.getElementById(inputId);
-  if (!input) return;
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
-  const sendBtn = document.getElementById(inputId.replace('rit-', 'rsb-'));
-  if (sendBtn) sendBtn.disabled = true;
-  // Save reply to Firestore
-  await db.collection(collection).doc(docId)
-    .collection('comments').doc(commentId)
-    .collection('replies').add({
-      authorId: CU.uid,
-      authorName: CUD.displayName,
-      authorUsername: CUD.username,
-      authorPhoto: CUD.photoURL || null,
-      text,
-      createdAt: ts()
-    });
-  // Update reply count on comment
-  await db.collection(collection).doc(docId)
-    .collection('comments').doc(commentId)
-    .update({ replyCount: firebase.firestore.FieldValue.increment(1) });
-  // Close reply box
-  const wrap = document.getElementById(`ri-${commentId}`);
-  if (wrap) wrap.classList.add('hidden');
-  // Reload replies
-  loadReplies(collection, docId, commentId);
-}
-
-function loadReplies(collection, docId, commentId, depth) {
-  depth = depth || 0;
-  const list = document.getElementById(`replies-${commentId}`);
-  if (!list) return;
-  db.collection(collection).doc(docId)
-    .collection('comments').doc(commentId)
-    .collection('replies')
-    .orderBy('createdAt', 'asc')
-    .onSnapshot(snap => {
-      const countEl = document.getElementById(`rc-${commentId}`);
-      if (countEl) countEl.textContent = snap.size > 0 ? `${snap.size} ${snap.size === 1 ? 'reply' : 'replies'}` : '';
-      if (snap.empty) { list.innerHTML = ''; return; }
-      list.innerHTML = '';
-      snap.forEach(doc => {
-        const d = doc.data();
-        const replyId = doc.id;
-        const item = document.createElement('div');
-        item.className = 'reply-item';
-        item.dataset.replyId = replyId;
-        const avHTML = d.authorPhoto
-          ? `<div class="reply-av"><img src="${d.authorPhoto}"/></div>`
-          : `<div class="reply-av">${(d.authorName||'?').charAt(0).toUpperCase()}</div>`;
-        item.innerHTML = `
-          ${avHTML}
-          <div class="reply-body">
-            <div class="com-hdr">
-              <span class="com-name">${esc(d.authorName)}</span>
-              <span class="com-un">${esc(d.authorUsername)}</span>
-              <span class="com-time">${d.createdAt ? timeAgo(d.createdAt.toDate()) : 'now'}</span>
-            </div>
-            <div class="com-text">${esc(d.text)}</div>
-            ${depth < 3 ? `
-            <div class="com-actions">
-              <button class="reply-btn" onclick="toggleNestedReplyBox('${replyId}','${esc(d.authorUsername)}','${collection}','${docId}','${commentId}')">
-                <i class="fa-solid fa-reply"></i> Reply
-              </button>
-              <span class="reply-count" id="rc-${replyId}"></span>
-            </div>
-            <div class="reply-input-wrap hidden" id="ri-${replyId}">
-              <div class="reply-input-row">
-                <div class="com-av-sm">${CUD.photoURL?`<img src="${CUD.photoURL}"/>`:(CUD.displayName||'?').charAt(0).toUpperCase()}</div>
-                <div class="com-input-wrap" style="flex:1;">
-                  <input type="text" id="rit-${replyId}"
-                    placeholder="Replying to ${esc(d.authorUsername)}..."
-                    maxlength="200"
-                    oninput="document.getElementById('rsb-${replyId}').disabled=!this.value.trim()"/>
-                  <button id="rsb-${replyId}" class="com-send-btn" disabled
-                    onclick="submitNestedReply('${collection}','${docId}','${commentId}','${replyId}','rit-${replyId}','nested-replies-${replyId}')">
-                    <i class="fa-solid fa-paper-plane"></i>
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div class="replies-list nested-replies" id="nested-replies-${replyId}"></div>
-            ` : ''}
-          </div>`;
-        list.appendChild(item);
-        // Load nested replies after element in DOM
-        if (depth < 3) {
-          setTimeout(() => loadNestedReplies(collection, docId, commentId, replyId, depth + 1), 100);
-        }
-      });
-    });
-}
-
-function loadNestedReplies(collection, docId, commentId, replyId, depth) {
-  const list = document.getElementById(`nested-replies-${replyId}`);
-  if (!list) return;
-  db.collection(collection).doc(docId)
-    .collection('comments').doc(commentId)
-    .collection('replies').doc(replyId)
-    .collection('replies')
-    .orderBy('createdAt', 'asc')
-    .onSnapshot(snap => {
-      const countEl = document.getElementById(`rc-${replyId}`);
-      if (countEl) countEl.textContent = snap.size > 0 ? `${snap.size} ${snap.size === 1 ? 'reply' : 'replies'}` : '';
-      if (snap.empty) { list.innerHTML = ''; return; }
-      list.innerHTML = '';
-      snap.forEach(doc => {
-        const d = doc.data();
-        const item = document.createElement('div');
-        item.className = 'reply-item';
-        const avHTML = d.authorPhoto
-          ? `<div class="reply-av"><img src="${d.authorPhoto}"/></div>`
-          : `<div class="reply-av">${(d.authorName||'?').charAt(0).toUpperCase()}</div>`;
-        item.innerHTML = `
-          ${avHTML}
-          <div class="reply-body">
-            <div class="com-hdr">
-              <span class="com-name">${esc(d.authorName)}</span>
-              <span class="com-un">${esc(d.authorUsername)}</span>
-              <span class="com-time">${d.createdAt ? timeAgo(d.createdAt.toDate()) : 'now'}</span>
-            </div>
-            <div class="com-text">${esc(d.text)}</div>
-          </div>`;
-        list.appendChild(item);
-      });
-    });
-}
-
-function toggleNestedReplyBox(replyId, username, collection, docId, commentId) {
-  // Close all open reply boxes
-  document.querySelectorAll('.reply-input-wrap').forEach(w => w.classList.add('hidden'));
-  const wrap = document.getElementById(`ri-${replyId}`);
-  if (wrap) {
-    wrap.classList.remove('hidden');
-    const input = document.getElementById(`rit-${replyId}`);
-    if (input) input.focus();
-  }
-}
-
-async function submitNestedReply(collection, docId, commentId, replyId, inputId, listId) {
-  const input = document.getElementById(inputId);
-  if (!input) return;
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
-  const sendBtn = document.getElementById(inputId.replace('rit-', 'rsb-'));
-  if (sendBtn) sendBtn.disabled = true;
-  await db.collection(collection).doc(docId)
-    .collection('comments').doc(commentId)
-    .collection('replies').doc(replyId)
-    .collection('replies').add({
-      authorId: CU.uid,
-      authorName: CUD.displayName,
-      authorUsername: CUD.username,
-      authorPhoto: CUD.photoURL || null,
-      text,
-      createdAt: ts()
-    });
-  await db.collection(collection).doc(docId)
-    .collection('comments').doc(commentId)
-    .collection('replies').doc(replyId)
-    .update({ replyCount: firebase.firestore.FieldValue.increment(1) });
-  const wrap = document.getElementById(`ri-${replyId}`);
-  if (wrap) wrap.classList.add('hidden');
-  loadNestedReplies(collection, docId, commentId, replyId, 1);
-}
+function timeAgo(d){const s=Math.floor((Date.now()-d)/1000);if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';if(s<604800)return Math.floor(s/86400)+'d';return d.toLocaleDateString();}
+function timeLeft(d){if(!d)return'';const s=Math.max(0,Math.floor((d-Date.now())/1000));if(s<60)return s+'s left';if(s<3600)return Math.floor(s/60)+'m left';if(s<86400)return Math.floor(s/3600)+'h left';return Math.floor(s/86400)+'d left';}
+function showToast(msg){const old=document.getElementById('toast');if(old)old.remove();const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3200);}
+function setBtnLoad(btn,loading,reset){if(!btn)return;if(loading){btn.innerHTML='<div class="spin" style="width:16px;height:16px;border-color:rgba(255,255,255,.3);border-top-color:#fff;margin:0 auto;"></div>';btn.disabled=true;}else{if(reset)btn.innerHTML=reset;btn.disabled=false;}}
+const coinPopStyle=document.createElement('style');
+coinPopStyle.textContent='@keyframes coinPop{0%{opacity:1;transform:scale(1) translateY(0)}100%{opacity:0;transform:scale(.7) translateY(-90px)}}';
+document.head.appendChild(coinPopStyle);

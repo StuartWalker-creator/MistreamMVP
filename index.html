@@ -2,334 +2,186 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<meta name="theme-color" content="#060608"/>
 <title>MiStream</title>
+<link rel="manifest" href="manifest.json"/>
 <link rel="stylesheet" href="style.css"/>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
 </head>
 <body>
 
-<!-- ════════════════════════════════
-     SPLASH
-════════════════════════════════ -->
+<!-- SPLASH -->
 <div id="splash" class="splash">
   <div class="splash-glow"></div>
   <div class="splash-grid"></div>
   <div class="splash-content">
-    <div class="brand"><span class="mi">MI</span><span class="stream">STREAM</span></div>
-    <div class="tagline">Prove what you're made of.</div>
+    <div class="brand"><span class="mi">MI</span><span class="st">STREAM</span></div>
+    <p class="splash-tag">Prove what you're made of.</p>
     <div class="splash-bar"><div class="splash-fill"></div></div>
   </div>
 </div>
 
-<!-- ════════════════════════════════
-     AUTH
-════════════════════════════════ -->
-<div id="auth" class="auth-screen hidden">
+<!-- AUTH -->
+<div id="auth" class="auth-wrap hidden">
   <!-- LOGIN -->
   <div id="v-login" class="auth-view">
-    <div class="auth-top">
-      <div class="brand"><span class="mi">MI</span><span class="stream">STREAM</span></div>
-      <p class="auth-sub">Where creators prove themselves.</p>
-    </div>
+    <div class="auth-logo"><div class="brand lg"><span class="mi">MI</span><span class="st">STREAM</span></div><p>Where comedians prove themselves.</p></div>
     <div class="auth-card">
       <h2>Welcome back</h2>
       <div class="fg"><label>Email</label><input type="email" id="l-email" placeholder="you@email.com"/></div>
       <div class="fg"><label>Password</label><input type="password" id="l-pass" placeholder="••••••••"/></div>
       <div class="errmsg hidden" id="l-err"></div>
-      <button class="btn-or" onclick="doLogin()"><span>Sign In</span><i class="fa-solid fa-arrow-right"></i></button>
-      <div class="divider"><span>or</span></div>
-      <button class="btn-ghost" onclick="sv('v-register')">Create Account</button>
+      <button class="btn-or w" id="l-btn" onclick="doLogin()"><span>Sign In</span><i class="fa-solid fa-arrow-right"></i></button>
+      <div class="auth-or"><span>or</span></div>
+      <button class="btn-ghost w" onclick="sv('v-register')">Create Account</button>
     </div>
   </div>
   <!-- REGISTER -->
   <div id="v-register" class="auth-view hidden">
-    <div class="auth-top">
-      <div class="brand"><span class="mi">MI</span><span class="stream">STREAM</span></div>
-      <p class="auth-sub">Claim your niche identity.</p>
-    </div>
+    <div class="auth-logo"><div class="brand lg"><span class="mi">MI</span><span class="st">STREAM</span></div><p>Join Uganda's comedy arena.</p></div>
     <div class="auth-card">
       <h2>Create Account</h2>
       <div class="fg">
-        <label>Profile Photo (optional)</label>
+        <label>Profile Photo <span style="color:var(--mu);font-weight:400;">(optional)</span></label>
         <div class="photo-row">
-          <div class="photo-circle" id="reg-photo-circle"><i class="fa-solid fa-user"></i></div>
-          <button type="button" class="photo-pick-btn" onclick="document.getElementById('reg-photo-file').click()"><i class="fa-solid fa-camera"></i> Choose Photo</button>
+          <div class="photo-prev" id="reg-photo-prev"><i class="fa-solid fa-user"></i></div>
+          <button type="button" class="btn-ghost" style="flex:1;padding:10px;" onclick="document.getElementById('reg-photo-file').click()"><i class="fa-solid fa-camera"></i> Choose Photo</button>
           <input type="file" id="reg-photo-file" accept="image/*" hidden onchange="previewRegPhoto(this)"/>
         </div>
       </div>
-      <div class="fg"><label>Your Name</label><input type="text" id="r-name" placeholder="e.g. Stuart" oninput="updatePreview()"/></div>
-      <div class="fg">
-        <label>Your Primary Niche</label>
-        <div class="niche-grid" id="niche-grid">
-          <div class="no" data-n="comedy" onclick="pickNiche(this)"><i class="fa-solid fa-masks-theater"></i><span>Comedy</span></div>
-          <div class="no" data-n="trading" onclick="pickNiche(this)"><i class="fa-solid fa-chart-line"></i><span>Trading</span></div>
-          <div class="no" data-n="music" onclick="pickNiche(this)"><i class="fa-solid fa-music"></i><span>Music</span></div>
-          <div class="no" data-n="fashion" onclick="pickNiche(this)"><i class="fa-solid fa-shirt"></i><span>Fashion</span></div>
-          <div class="no" data-n="football" onclick="pickNiche(this)"><i class="fa-solid fa-futbol"></i><span>Football</span></div>
-          <div class="no" data-n="fitness" onclick="pickNiche(this)"><i class="fa-solid fa-dumbbell"></i><span>Fitness</span></div>
-          <div class="no" data-n="travel" onclick="pickNiche(this)"><i class="fa-solid fa-plane"></i><span>Travel</span></div>
-          <div class="no" data-n="gaming" onclick="pickNiche(this)"><i class="fa-solid fa-gamepad"></i><span>Gaming</span></div>
-          <div class="no" data-n="food" onclick="pickNiche(this)"><i class="fa-solid fa-utensils"></i><span>Food</span></div>
-          <div class="no" data-n="art" onclick="pickNiche(this)"><i class="fa-solid fa-palette"></i><span>Art</span></div>
-          <div class="no" data-n="dance" onclick="pickNiche(this)"><i class="fa-solid fa-person-dancing"></i><span>Dance</span></div>
-          <div class="no" data-n="business" onclick="pickNiche(this)"><i class="fa-solid fa-briefcase"></i><span>Business</span></div>
-        </div>
+      <div class="fg"><label>Your Name</label><input type="text" id="r-name" placeholder="e.g. MC Stubborn" oninput="updateUsernamePreview()"/></div>
+      <div class="niche-locked">
+        <div class="nl-icon"><i class="fa-solid fa-masks-theater"></i></div>
+        <div class="nl-info"><div class="nl-label">Your Niche</div><div class="nl-val">Comedy <span>@comedy</span></div></div>
+        <div class="nl-badge">BETA</div>
       </div>
-      <div class="upreview hidden" id="upreview"><span class="upl">Your identity</span><span class="upn" id="upn">you@niche</span></div>
+      <div class="upreview hidden" id="upreview">
+        <span class="upl">Your identity</span>
+        <span class="upn" id="upn">name@comedy</span>
+      </div>
       <div class="fg"><label>Email</label><input type="email" id="r-email" placeholder="you@email.com"/></div>
-      <div class="fg"><label>Password</label><input type="password" id="r-pass" placeholder="Min 6 characters"/></div>
+      <div class="fg"><label>Password</label><input type="password" id="r-pass" placeholder="Minimum 6 characters"/></div>
       <div class="errmsg hidden" id="r-err"></div>
-      <button class="btn-or" id="reg-btn" onclick="doRegister()"><span>Claim My Identity</span><i class="fa-solid fa-arrow-right"></i></button>
-      <div class="divider"><span>or</span></div>
-      <button class="btn-ghost" onclick="sv('v-login')">Sign In Instead</button>
+      <button class="btn-or w" id="reg-btn" onclick="doRegister()"><span>Claim My Identity</span><i class="fa-solid fa-arrow-right"></i></button>
+      <div class="auth-or"><span>or</span></div>
+      <button class="btn-ghost w" onclick="sv('v-login')">Sign In Instead</button>
     </div>
   </div>
 </div>
 
-<!-- ════════════════════════════════
-     MAIN APP
-════════════════════════════════ -->
+<!-- APP -->
 <div id="app" class="hidden">
 
-  <!-- TOPBAR -->
+  <!-- TOP BAR -->
   <!--<div class="topbar" id="topbar">
-    <div class="brand sm"><span class="mi">MI</span><span class="stream">STREAM</span></div>
-    <div class="topbar-right">
-      <div class="notif-wrap" onclick="showScreen('notifications')">
-        <i class="fa-regular fa-bell"></i>
-        <span class="notif-dot hidden" id="notif-dot"></span>
-      </div>
-      <div class="top-av" id="top-av" onclick="showScreen('profile')"></div>
+    <div class="brand sm"><span class="mi">MI</span><span class="st">STREAM</span></div>
+    <div class="topbar-r">
+      <div class="top-av" id="top-av" onclick="showScr('profile')"></div>
     </div>
-  </div> -->
+  </div>-->
 
-  <!-- SCREENS CONTAINER -->
+  <!-- SCREENS -->
   <div class="screens" id="screens">
 
-    <!-- ══ FEED ══ -->
-    <div class="screen active" id="scr-feed">
-      <div class="niche-bar" id="niche-bar">
-        <div class="nb active" data-n="all" onclick="setFeedNiche(this)">All</div>
-        <div class="nb" data-n="comedy" onclick="setFeedNiche(this)"><i class="fa-solid fa-masks-theater"></i></div>
-        <div class="nb" data-n="trading" onclick="setFeedNiche(this)"><i class="fa-solid fa-chart-line"></i></div>
-        <div class="nb" data-n="music" onclick="setFeedNiche(this)"><i class="fa-solid fa-music"></i></div>
-        <div class="nb" data-n="fashion" onclick="setFeedNiche(this)"><i class="fa-solid fa-shirt"></i></div>
-        <div class="nb" data-n="football" onclick="setFeedNiche(this)"><i class="fa-solid fa-futbol"></i></div>
-        <div class="nb" data-n="fitness" onclick="setFeedNiche(this)"><i class="fa-solid fa-dumbbell"></i></div>
-        <div class="nb" data-n="travel" onclick="setFeedNiche(this)"><i class="fa-solid fa-plane"></i></div>
-        <div class="nb" data-n="gaming" onclick="setFeedNiche(this)"><i class="fa-solid fa-gamepad"></i></div>
-        <div class="nb" data-n="food" onclick="setFeedNiche(this)"><i class="fa-solid fa-utensils"></i></div>
-        <div class="nb" data-n="dance" onclick="setFeedNiche(this)"><i class="fa-solid fa-person-dancing"></i></div>
-      </div>
+    <!-- FEED -->
+    <div class="scr active" id="scr-feed">
       <div class="tk-feed" id="tk-feed"></div>
     </div>
 
-    <!-- ══ CHALLENGES ══ -->
-    <div class="screen" id="scr-challenges">
-      <div class="chal-hdr">
-        <h2><i class="fa-solid fa-shield-halved"></i> Challenges</h2>
-        <button class="btn-icon-or" onclick="showScreen('create-community-challenge')"><i class="fa-solid fa-plus"></i> New</button>
-      </div>
-      <div class="ctabs">
-        <div class="ctab active" data-t="1v1" onclick="setChalTab(this)">1v1 Battles</div>
-        <div class="ctab" data-t="community" onclick="setChalTab(this)">Community</div>
-        <div class="ctab" data-t="mine" onclick="setChalTab(this)">Mine</div>
-      </div>
-      <div class="chal-list" id="chal-list"></div>
-    </div>
-
-    <!-- ══ CREATE POST ══ -->
-    <div class="screen" id="scr-post">
-      <div class="pg-hdr light"><h2><i class="fa-solid fa-plus"></i> New Post</h2></div>
-      <div class="post-form" id="post-form">
-        <div class="my-identity" id="my-identity"></div>
-        <div class="media-drop" id="media-drop" onclick="document.getElementById('post-media').click()">
-          <i class="fa-solid fa-photo-film"></i>
-          <span>Tap to add photo or video</span>
-          <input type="file" id="post-media" accept="image/*,video/*" hidden onchange="previewPostMedia(this)"/>
+    <!-- CHALLENGES -->
+    <div class="scr" id="scr-challenges">
+      <div class="chal-wrap">
+        <div class="chal-topbar">
+          <h2><i class="fa-solid fa-shield-halved"></i> Challenges</h2>
+          <button class="btn-icon-sm" onclick="showScr('create-community')"><i class="fa-solid fa-plus"></i></button>
         </div>
-        <div id="post-media-preview" class="hidden"></div>
-        <div class="fg light">
-          <label>Caption</label>
-          <textarea id="post-caption" placeholder="What are you proving today?" rows="3" maxlength="300" oninput="document.getElementById('cap-cnt').textContent=this.value.length+'/300'"></textarea>
-          <span class="char-cnt" id="cap-cnt">0/300</span>
+        <div class="chal-tabs">
+          <div class="ctab active" data-t="battles" onclick="setChalTab(this)">⚔️ Battles</div>
+          <div class="ctab" data-t="community" onclick="setChalTab(this)">🏆 Community</div>
+          <div class="ctab" data-t="leaderboard" onclick="setChalTab(this)">📊 Leaderboard</div>
         </div>
-        <div class="fg light">
-          <label>Niche</label>
-          <select id="post-niche" class="sel-light"></select>
-        </div>
-        <div class="errmsg hidden" id="post-err"></div>
-        <button class="btn-or" onclick="doPost()"><span>Publish Post</span><i class="fa-solid fa-paper-plane"></i></button>
+        <div class="chal-body" id="chal-body"></div>
       </div>
     </div>
 
-    <!-- ══ PROFILE ══ -->
-    <div class="screen" id="scr-profile">
-      <div id="profile-content"></div>
-    </div>
-
-    <!-- ══ NOTIFICATIONS ══ -->
-    <div class="screen" id="scr-notifications">
-      <div class="pg-hdr light"><h2><i class="fa-regular fa-bell"></i> Notifications</h2></div>
-      <div id="notif-list" class="notif-list"></div>
-    </div>
-
-    <!-- ══ VIEW 1V1 CHALLENGE ══ -->
-    <div class="screen" id="scr-view1v1">
-      <div class="pg-hdr light back-hdr">
-        <button class="back-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button>
-        <h2>1v1 Battle</h2>
-      </div>
-      <div id="view1v1-content"></div>
-    </div>
-
-    <!-- ══ VIEW COMMUNITY CHALLENGE ══ -->
-    <div class="screen" id="scr-viewcommunity">
-      <div class="pg-hdr light back-hdr">
-        <button class="back-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button>
-        <h2>Community Challenge</h2>
-      </div>
-      <div id="viewcommunity-content"></div>
-    </div>
-
-    <!-- ══ CREATE 1V1 CHALLENGE ══ -->
-    <div class="screen" id="scr-create1v1">
-      <div class="pg-hdr light back-hdr">
-        <button class="back-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button>
-        <h2>Issue 1v1 Challenge</h2>
-      </div>
-      <div class="post-form" id="create1v1-form">
-        <div class="chal-to-card" id="chal-to-card"></div>
-        <div class="fg light">
-          <label>Challenge Name</label>
-          <input type="text" id="c1v1-name" placeholder="e.g. Roast Battle, Best Skit..." maxlength="60"/>
-        </div>
-        <div class="fg light">
-          <label>Your Entry Post</label>
-          <div class="post-picker" id="post-picker-1v1">
-            <div class="picker-opts">
-              <button class="picker-tab active" onclick="setPickerTab(this,'existing')">Use Existing Post</button>
-              <button class="picker-tab" onclick="setPickerTab(this,'new')">Create New Post</button>
-            </div>
-            <div id="existing-posts-list" class="existing-list"></div>
-            <div id="new-post-section" class="hidden">
-              <div class="media-drop sm" onclick="document.getElementById('c1v1-media').click()">
-                <i class="fa-solid fa-photo-film"></i><span>Add photo or video</span>
-                <input type="file" id="c1v1-media" accept="image/*,video/*" hidden onchange="previewC1v1Media(this)"/>
-              </div>
-              <div id="c1v1-media-preview" class="hidden"></div>
-              <div class="fg light" style="margin-top:10px;">
-                <textarea id="c1v1-caption" placeholder="Caption for your challenge post..." rows="2" maxlength="200"></textarea>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="fg light">
-          <label>Challenge Expires In</label>
-          <select id="c1v1-expiry" class="sel-light">
-            <option value="1">1 Day</option>
-            <option value="2">2 Days</option>
-            <option value="3" selected>3 Days</option>
-            <option value="5">5 Days</option>
-            <option value="7">7 Days</option>
-          </select>
-        </div>
-        <div class="errmsg hidden" id="c1v1-err"></div>
-        <button class="btn-or" onclick="submitC1v1()"><i class="fa-solid fa-shield-halved"></i> <span>Send Challenge</span></button>
-      </div>
-    </div>
-
-    <!-- ══ CREATE COMMUNITY CHALLENGE ══ -->
-    <div class="screen" id="scr-create-community-challenge">
-      <div class="pg-hdr light back-hdr">
-        <button class="back-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button>
-        <h2>Create Community Challenge</h2>
-      </div>
+    <!-- CREATE POST -->
+    <div class="scr" id="scr-post">
+      <div class="pg-hdr"><h2><i class="fa-solid fa-plus"></i> New Post</h2></div>
       <div class="post-form">
-        <div class="fg light">
-          <label>Challenge Name</label>
-          <input type="text" id="cc-name" placeholder="e.g. Best Comedy Skit Uganda 2026" maxlength="80"/>
+        <div class="my-id" id="my-id"></div>
+        <div class="mdrop" id="mdrop" onclick="document.getElementById('pmedia').click()">
+          <i class="fa-solid fa-photo-film"></i>
+          <span>Add photo or video</span>
+          <input type="file" id="pmedia" accept="image/*,video/*" hidden onchange="prevPostMedia(this)"/>
         </div>
-        <div class="fg light">
-          <label>Description</label>
-          <textarea id="cc-desc" placeholder="What's this challenge about? Rules, theme, judging criteria..." rows="3" maxlength="300"></textarea>
-        </div>
-        <div class="fg light">
-          <label>Niche</label>
-          <select id="cc-niche" class="sel-light"></select>
-        </div>
-        <div class="fg light">
-          <label>Your First Entry (Required)</label>
-          <p class="field-hint">As creator you must submit the first post to start the challenge.</p>
-          <div class="media-drop sm" onclick="document.getElementById('cc-media').click()">
-            <i class="fa-solid fa-photo-film"></i><span>Add your entry photo or video</span>
-            <input type="file" id="cc-media" accept="image/*,video/*" hidden onchange="previewCCMedia(this)"/>
-          </div>
-          <div id="cc-media-preview" class="hidden"></div>
-          <div class="fg light" style="margin-top:10px;">
-            <textarea id="cc-entry-caption" placeholder="Caption for your entry..." rows="2" maxlength="200"></textarea>
-          </div>
+        <div id="pmedia-prev" class="hidden"></div>
+        <div class="fg light"><label>Caption</label><textarea id="pcap" placeholder="What are you proving today?" rows="3" maxlength="300" oninput="document.getElementById('pcnt').textContent=this.value.length+'/300'"></textarea><span class="ccnt" id="pcnt">0/300</span></div>
+        <div class="errmsg hidden" id="post-err"></div>
+        <button class="btn-or w" onclick="doPost()"><span>Publish</span><i class="fa-solid fa-paper-plane"></i></button>
+      </div>
+    </div>
+
+    <!-- PROFILE -->
+    <div class="scr" id="scr-profile">
+      <div id="profile-body"></div>
+    </div>
+
+    <!-- NOTIFICATIONS -->
+    <div class="scr" id="scr-notifications">
+      <div class="pg-hdr"><h2><i class="fa-regular fa-bell"></i> Notifications</h2></div>
+      <div id="notif-body" class="notif-body"></div>
+    </div>
+
+    <!-- VIEW PROFILE (other user) -->
+    <div class="scr" id="scr-viewprofile">
+      <div class="pg-hdr back-hdr"><button class="bk-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button><h2>Profile</h2></div>
+      <div id="viewprofile-body"></div>
+    </div>
+
+    <!-- VIEW CHALLENGE (1v1 detail) -->
+    <div class="scr" id="scr-viewchallenge">
+      <div class="pg-hdr back-hdr"><button class="bk-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button><h2>⚔️ Battle</h2></div>
+      <div id="viewchallenge-body"></div>
+    </div>
+
+    <!-- CREATE COMMUNITY CHALLENGE -->
+    <div class="scr" id="scr-create-community">
+      <div class="pg-hdr back-hdr"><button class="bk-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button><h2>Launch Challenge</h2></div>
+      <div class="post-form">
+        <div class="fg light"><label>Challenge Name</label><input type="text" id="cc-name" placeholder="e.g. Best Skit This Week" maxlength="80"/></div>
+        <div class="fg light"><label>Description</label><textarea id="cc-desc" placeholder="What's this about? Rules, theme..." rows="2" maxlength="250"></textarea></div>
+        <div class="fg light"><label>Your First Entry (Required)</label><p class="field-hint">You must post first to start the challenge.</p>
+          <div class="mdrop sm" onclick="document.getElementById('cc-media').click()"><i class="fa-solid fa-photo-film"></i><span>Add entry media</span><input type="file" id="cc-media" accept="image/*,video/*" hidden onchange="prevCCMedia(this)"/></div>
+          <div id="cc-media-prev" class="hidden"></div>
+          <div class="fg light mt8"><textarea id="cc-cap" placeholder="Caption for your entry..." rows="2" maxlength="200"></textarea></div>
         </div>
         <div class="errmsg hidden" id="cc-err"></div>
-        <button class="btn-or" onclick="submitCC()"><i class="fa-solid fa-flag"></i> <span>Launch Challenge</span></button>
+        <button class="btn-or w" onclick="submitCC()"><i class="fa-solid fa-flag"></i> <span>Launch Challenge</span></button>
       </div>
     </div>
 
-    <!-- ══ VIEW OTHER USER PROFILE ══ -->
-    <div class="screen" id="scr-viewprofile">
-      <div class="pg-hdr light back-hdr">
-        <button class="back-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button>
-        <h2>Profile</h2>
-      </div>
-      <div id="viewprofile-content"></div>
+    <!-- ACCEPT/DECLINE CHALLENGE -->
+    <div class="scr" id="scr-respond-challenge">
+      <div class="pg-hdr back-hdr"><button class="bk-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button><h2>Challenge Request</h2></div>
+      <div id="respond-body"></div>
     </div>
 
-    <!-- ══ COMMENTS ══ -->
-    <div class="screen" id="scr-comments">
-      <div class="pg-hdr light back-hdr">
-        <button class="back-btn" onclick="closeComments()"><i class="fa-solid fa-chevron-left"></i></button>
-        <h2><i class="fa-regular fa-comment-dots"></i> Comments</h2>
-      </div>
-      <div id="comments-list" class="comments-list"></div>
-      <div class="comment-input-bar">
-        <div class="com-av-sm" id="com-av-sm"></div>
-        <div class="com-input-wrap">
-          <input type="text" id="com-text" placeholder="Add a comment..." maxlength="300" oninput="document.getElementById('com-send').disabled=!this.value.trim()"/>
-          <button id="com-send" class="com-send-btn" disabled onclick="submitComment()"><i class="fa-solid fa-paper-plane"></i></button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══ JOIN COMMUNITY CHALLENGE ══ -->
-    <div class="screen" id="scr-join-community">
-      <div class="pg-hdr light back-hdr">
-        <button class="back-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button>
-        <h2>Submit Your Entry</h2>
-      </div>
+    <!-- JOIN COMMUNITY CHALLENGE -->
+    <div class="scr" id="scr-join-community">
+      <div class="pg-hdr back-hdr"><button class="bk-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button><h2>Submit Entry</h2></div>
       <div class="post-form">
-        <div class="joining-card" id="joining-card"></div>
-        <div class="fg light">
-          <label>Choose how to enter</label>
-          <div class="picker-opts">
-            <button class="picker-tab active" onclick="setJoinTab(this,'existing')">Use Existing Post</button>
-            <button class="picker-tab" onclick="setJoinTab(this,'new')">Create New Post</button>
-          </div>
-          <div id="join-existing-list" class="existing-list"></div>
-          <div id="join-new-section" class="hidden">
-            <div class="media-drop sm" onclick="document.getElementById('join-media').click()">
-              <i class="fa-solid fa-photo-film"></i><span>Add photo or video</span>
-              <input type="file" id="join-media" accept="image/*,video/*" hidden onchange="previewJoinMedia(this)"/>
-            </div>
-            <div id="join-media-preview" class="hidden"></div>
-            <div class="fg light" style="margin-top:10px;">
-              <textarea id="join-caption" placeholder="Caption for your entry..." rows="2" maxlength="200"></textarea>
-            </div>
-          </div>
+        <div class="joining-info" id="joining-info"></div>
+        <div class="picker-tabs"><button class="ptab active" onclick="setPickTab(this,'existing')">Use Existing Post</button><button class="ptab" onclick="setPickTab(this,'new')">New Post</button></div>
+        <div id="join-existing"></div>
+        <div id="join-new" class="hidden">
+          <div class="mdrop sm" onclick="document.getElementById('jn-media').click()"><i class="fa-solid fa-photo-film"></i><span>Add media</span><input type="file" id="jn-media" accept="image/*,video/*" hidden onchange="prevJoinMedia(this)"/></div>
+          <div id="jn-media-prev" class="hidden"></div>
+          <div class="fg light mt8"><textarea id="jn-cap" placeholder="Caption..." rows="2" maxlength="200"></textarea></div>
         </div>
         <div class="errmsg hidden" id="join-err"></div>
-        <button class="btn-or" onclick="submitJoin()"><i class="fa-solid fa-shield-halved"></i> <span>Submit Entry</span></button>
+        <button class="btn-or w" onclick="submitJoin()"><i class="fa-solid fa-shield-halved"></i> <span>Submit Entry</span></button>
       </div>
     </div>
 
@@ -337,36 +189,49 @@
 
   <!-- BOTTOM NAV -->
   <nav class="bnav">
-    <div class="bn active" id="bn-feed" onclick="showScreen('feed')">
-      <i class="fa-solid fa-clapperboard"></i>
-      <span>Feed</span>
+    <div class="bn active" id="bn-feed" onclick="showScr('feed')"><i class="fa-solid fa-clapperboard"></i><span>Feed</span></div>
+    <div class="bn" id="bn-challenges" onclick="showScr('challenges')"><i class="fa-solid fa-shield-halved"></i><span>Battles</span></div>
+    <div class="bn-plus" onclick="showScr('post')"><i class="fa-solid fa-plus"></i></div>
+        <div class="bn" id="bn-notifications" onclick="showScr('notifications')">
+      <div style="position:relative;display:inline-flex;">
+        <i class="fa-regular fa-bell"></i>
+        <span class="notif-dot hidden" id="notif-dot"></span>
+      </div>
+      <span>Alerts</span>
     </div>
-    <div class="bn" id="bn-challenges" onclick="showScreen('challenges')">
-      <i class="fa-solid fa-shield-halved"></i>
-      <span>Challenges</span>
-    </div>
-    <div class="bn-plus" onclick="showScreen('post')">
-      <i class="fa-solid fa-plus"></i>
-    </div>
-     <div class="bn" onclick="showScreen('notifications')">
-   <i class="fa-regular fa-bell"></i>
-   <span class="notif-dot hidden" id="notif-dot"></span>
-   <span>Notifications</span>
- </div>
-    <div class="bn" id="bn-profile" onclick="showScreen('profile')">
-      <i class="fa-regular fa-user"></i>
-      <span>Me</span>
-    </div>
+
+    <div class="bn" id="bn-profile" onclick="showScr('profile')"><i class="fa-regular fa-user"></i><span>Me</span></div>
   </nav>
 
+  <!-- TOOLTIP SYSTEM -->
+  <div class="tooltip-overlay hidden" id="tooltip-overlay">
+    <div class="tooltip-backdrop" onclick="nextTip()"></div>
+    <div class="tooltip-bubble" id="tooltip-bubble">
+      <div class="tt-arrow" id="tt-arrow"></div>
+      <div class="tt-content" id="tt-content"></div>
+      <div class="tt-footer">
+        <span class="tt-step" id="tt-step"></span>
+        <button class="tt-next" onclick="nextTip()">Got it <i class="fa-solid fa-arrow-right"></i></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEARCH MODAL -->
+  <div class="modal-overlay hidden" id="search-modal">
+    <div class="search-sheet">
+      <div class="search-hdr">
+        <div class="search-input-wrap"><i class="fa-solid fa-magnifying-glass"></i><input type="text" id="search-input" placeholder="Search creators, captions..." oninput="doSearch(this.value)" autofocus/></div>
+        <button onclick="closeModal('search-modal')">Cancel</button>
+      </div>
+      <div id="search-results" class="search-results"></div>
+    </div>
+  </div>
+
   <!-- GIFT MODAL -->
-  <div class="modal-bg hidden" id="gift-modal">
+  <div class="modal-overlay hidden" id="gift-modal">
     <div class="modal-sheet">
       <div class="modal-drag"></div>
-      <div class="modal-hdr">
-        <h3><i class="fa-solid fa-coins"></i> Gift Creator</h3>
-        <button onclick="closeModal('gift-modal')"><i class="fa-solid fa-xmark"></i></button>
-      </div>
+      <div class="modal-hdr"><h3><i class="fa-solid fa-coins"></i> Gift Creator</h3><button onclick="closeModal('gift-modal')"><i class="fa-solid fa-xmark"></i></button></div>
       <div class="gift-to" id="gift-to"></div>
       <div class="gift-opts">
         <div class="gopt" onclick="pickGift(this,50)"><i class="fa-solid fa-star"></i><span>50</span><small>coins</small></div>
@@ -374,8 +239,62 @@
         <div class="gopt" onclick="pickGift(this,200)"><i class="fa-solid fa-gem"></i><span>200</span><small>coins</small></div>
         <div class="gopt" onclick="pickGift(this,500)"><i class="fa-solid fa-crown"></i><span>500</span><small>coins</small></div>
       </div>
-      <div class="gift-note"><i class="fa-solid fa-info-circle"></i><p>Real Mobile Money gifting launches in V1. Your tap is counted — every creator sees how many fans would have gifted them.</p></div>
-      <button class="btn-or" onclick="sendGift()"><i class="fa-solid fa-coins"></i> <span>Send Gift Intent</span></button>
+      <div class="gift-note"><i class="fa-solid fa-info-circle"></i><p>Real Mobile Money gifting launches in V1. Every tap is tracked — creators see exactly how many fans would have paid them.</p></div>
+      <button class="btn-or w" onclick="sendGift()"><i class="fa-solid fa-coins"></i> <span>Send Gift Intent</span></button>
+    </div>
+  </div>
+
+  <!-- CHALLENGE VOTE MODAL (from feed shield icon) -->
+  <div class="modal-overlay hidden" id="chal-vote-modal">
+    <div class="modal-sheet tall">
+      <div class="modal-drag"></div>
+      <div class="modal-hdr"><h3><i class="fa-solid fa-shield-halved"></i> Active Challenges</h3><button onclick="closeModal('chal-vote-modal')"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="chal-vote-subtitle" id="cvm-subtitle"></div>
+      <div id="chal-vote-list" class="chal-vote-list"></div>
+    </div>
+  </div>
+
+  <!-- CREATE 1V1 CHALLENGE MODAL (from feed shield when no challenges) -->
+  <div class="modal-overlay hidden" id="create-1v1-modal">
+    <div class="modal-sheet">
+      <div class="modal-drag"></div>
+      <div class="modal-hdr"><h3><i class="fa-solid fa-shield-halved"></i> Challenge This Post</h3><button onclick="closeModal('create-1v1-modal')"><i class="fa-solid fa-xmark"></i></button></div>
+      <div class="c1-target" id="c1-target"></div>
+      <div class="fg light"><label>Challenge Name</label><input type="text" id="c1-name" placeholder="e.g. Best Roast Battle" maxlength="60"/></div>
+      <div class="fg light"><label>Your Entry Post</label>
+        <div class="picker-tabs"><button class="ptab active" onclick="setPickTab(this,'c1-existing')">Existing Post</button><button class="ptab" onclick="setPickTab(this,'c1-new')">New Post</button></div>
+        <div id="c1-existing"></div>
+        <div id="c1-new" class="hidden">
+          <div class="mdrop sm" onclick="document.getElementById('c1-media').click()"><i class="fa-solid fa-photo-film"></i><span>Add media</span><input type="file" id="c1-media" accept="image/*,video/*" hidden onchange="prevC1Media(this)"/></div>
+          <div id="c1-media-prev" class="hidden"></div>
+          <div class="fg light mt8"><textarea id="c1-cap" placeholder="Caption..." rows="2" maxlength="200"></textarea></div>
+        </div>
+      </div>
+      <div class="fg light"><label>Expires in</label>
+        <select id="c1-expiry" class="sel-input"><option value="1">1 Day</option><option value="2">2 Days</option><option value="3" selected>3 Days</option><option value="5">5 Days</option><option value="7">7 Days</option></select>
+      </div>
+      <div class="errmsg hidden" id="c1-err"></div>
+      <button class="btn-or w" onclick="submitC1v1()"><i class="fa-solid fa-shield-halved"></i> <span>Send Challenge</span></button>
+    </div>
+  </div>
+
+  <!-- COMMENTS SHEET -->
+  <div class="cs-overlay hidden" id="cs-overlay">
+    <div class="cs-backdrop" onclick="closeComments()"></div>
+    <div class="cs-panel">
+      <div class="cs-drag"></div>
+      <div class="cs-hdr">
+        <h3><i class="fa-regular fa-comment-dots"></i> Comments <span id="cs-count"></span></h3>
+        <button onclick="closeComments()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="cs-list" class="cs-list"></div>
+      <div class="cs-input">
+        <div class="com-av-sm" id="cs-av"></div>
+        <div class="com-iw">
+          <input type="text" id="cs-text" placeholder="Add a comment..." maxlength="300" oninput="document.getElementById('cs-send').disabled=!this.value.trim()"/>
+          <button id="cs-send" class="cs-send-btn" disabled onclick="submitComment()"><i class="fa-solid fa-paper-plane"></i></button>
+        </div>
+      </div>
     </div>
   </div>
 

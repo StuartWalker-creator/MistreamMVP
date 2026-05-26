@@ -55,7 +55,7 @@ let tipIndex = 0;
 const TIPS = [
   {id:'scroll',title:'Scroll to discover',body:'Swipe up to see more comedy posts from creators around you.',anchor:'tk-feed',side:'bottom',x:'50%',y:'55%'},
   {id:'sound',title:'Toggle sound',body:'Tap the speaker icon to unmute videos.',anchor:'tk-mute',side:'left',x:'85%',y:'35%'},
-  {id:'gift',title:'Gift creators',body:'Tap the coin icon to show a creator you\'d pay them. Every tap is tracked — real Mobile Money gifting comes in V1.',anchor:'gift-act',side:'left',x:'85%',y:'55%'},
+  {id:'gift',title:'Gift creators',body:'Tap the coin icon to show a creator you\'d reward them. Every tap is tracked — real Mobile Money gifting comes in V1.',anchor:'gift-act',side:'left',x:'80%',y:'55%'},
   {id:'challenge',title:'Challenge or vote',body:'Tap the shield icon to challenge a creator or vote in an active battle.',anchor:'chal-act',side:'left',x:'85%',y:'70%'},
   {id:'battles',title:'See all battles',body:'Tap Battles below to watch ongoing 1v1 competitions and vote.',anchor:'bn-challenges',side:'top',x:'28%',y:'88%'}
 ];
@@ -91,7 +91,7 @@ function initApp() {
   listenNotifs();
   requestPushPermission();
   showScr('feed');
-  setTimeout(() => startTips(), 3000);
+  setTimeout(() => startTips(), 12000);
 }
 
 function setTopAv() {
@@ -721,14 +721,22 @@ async function openChalVoteModal(postId, authorName, btn) {
     const ceThumb=d.challengeeThumbURL||d.challengeeMediaURL;
     const tot=(d.challengerVotes||0)+(d.challengeeVotes||0);
     const crP=tot?Math.round((d.challengerVotes||0)/tot*100):50;
-    row.innerHTML=`
+  row.innerHTML = `
       <div class="cvm-top"><div class="cvm-name">${esc(d.name||'Battle')}</div><div class="cvm-timer">${isExpired?'Ended':timeLeft(d.expiresAt?.toDate())}</div></div>
       <div class="cvm-thumbs">
-        <div class="cvm-cr"><div class="cvm-thumb">${crThumb?`<img src="${crThumb}"/>`:'<div class="cvm-thumb-placeholder">🎭</div>'}</div><div class="cvm-cr-name">${esc(d.challengerName||'')}<span>${esc(d.challengerUsername||'')}</span></div><div class="cvm-votes">${fmtN(d.challengerVotes||0)}</div></div>
+        <div class="cvm-thumb">${crThumb?`<img src="${crThumb}"/>`:'<div class="cvm-thumb-placeholder">🎭</div>'}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="cvm-cr-name">${esc(d.challengerName||'')}<span>${esc(d.challengerUsername||'')}</span></div>
+          <div class="cvm-votes">${fmtN(d.challengerVotes||0)} <span style="font-family:Space Mono,monospace;font-size:8px;color:var(--mu);font-weight:400;">votes</span></div>
+        </div>
         <div class="cvm-vs-lbl">VS</div>
-        <div class="cvm-cr"><div class="cvm-thumb">${ceThumb?`<img src="${ceThumb}"/>`:'<div class="cvm-thumb-placeholder">⏳</div>'}</div><div class="cvm-cr-name">${esc(d.challengeeName||'')}<span>${esc(d.challengeeUsername||'')}</span></div><div class="cvm-votes">${fmtN(d.challengeeVotes||0)}</div></div>
+        <div style="flex:1;min-width:0;text-align:right;">
+          <div class="cvm-cr-name">${esc(d.challengeeName||'')}<span>${esc(d.challengeeUsername||'')}</span></div>
+          <div class="cvm-votes">${fmtN(d.challengeeVotes||0)} <span style="font-family:Space Mono,monospace;font-size:8px;color:var(--mu);font-weight:400;">votes</span></div>
+        </div>
+        <div class="cvm-thumb">${ceThumb?`<img src="${ceThumb}"/>`:'<div class="cvm-thumb-placeholder">⏳</div>'}</div>
       </div>
-      <div class="cvm-footer"><div class="cvm-footer-lbl">${tot} votes · ${esc(d.niche||'comedy')}</div><div class="cvm-go" onclick="closeModal('chal-vote-modal');viewBattle('${d.id}')">Vote Now →</div></div>`;
+      <div class="cvm-footer"><div class="cvm-footer-lbl">${tot} votes · ${isExpired?'Ended':timeLeft(d.expiresAt?.toDate())}</div><div class="cvm-go" onclick="closeModal('chal-vote-modal');goToBattle('${d.id}')">View Battle →</div></div>`;
     list.appendChild(row);
   });
 }
@@ -937,8 +945,9 @@ function initBattles() {
 }
 
 function buildBattleCard(chalId, d) {
-  const div=document.createElement('div');
-  div.className='battle-card';
+  const div = document.createElement('div');
+div.className = 'battle-card';
+div.dataset.chalId = chalId;
   const isExpired=d.expiresAt&&d.expiresAt.toDate()<new Date();
   const isPending=d.status==='pending';
   const isActive=d.status==='active';
@@ -1002,7 +1011,7 @@ function playBcVid(playId,pauseId,chalId){
   const pv=document.getElementById(playId+'-vid'),pav=document.getElementById(pauseId+'-vid');
   const pt=document.getElementById(playId+'-thumb'),pi=document.getElementById(playId+'-pi'),pause=document.getElementById(playId+'-pause');
   if(!pv)return;
-  if(pv.style.display==='none'||!pv.style.display){
+  if(pv.style.display!=='block'){
     if(pt)pt.style.display='none';
     pv.style.display='block';pv.muted=bcMuted;pv.play().catch(()=>{});
     if(pi)pi.classList.add('gone');
@@ -1392,8 +1401,12 @@ async function loadFeedFromAuthor(targetPostId,authorId){
   const seen=new Set();
   snap.forEach(doc=>{const el=buildTkPostSync(doc.id,doc.data(),idx);feed.appendChild(el);if(doc.id===targetPostId)targetEl=el;seen.add(doc.id);idx++;});
   others.forEach(doc=>{if(!seen.has(doc.id)){feed.appendChild(buildTkPostSync(doc.id,doc.data(),idx));idx++;}});
-  setTimeout(()=>{setupObserver();if(targetEl)targetEl.scrollIntoView();},400);
-}
+setTimeout(() => {
+  setupObserver();
+  // Find the post by its data-post-id attribute instead of stale reference
+  const target = feed.querySelector(`[data-post-id="${targetPostId}"]`);
+  if (target) target.scrollIntoView({ block: 'start' });
+}, 1200);}
 
 // ─────────────────────────────────────────────
 // NOTIFICATIONS
@@ -1508,3 +1521,25 @@ function setBtnLoad(btn,loading,reset){if(!btn)return;if(loading){btn.innerHTML=
 const coinPopStyle=document.createElement('style');
 coinPopStyle.textContent='@keyframes coinPop{0%{opacity:1;transform:scale(1) translateY(0)}100%{opacity:0;transform:scale(.7) translateY(-90px)}}';
 document.head.appendChild(coinPopStyle);
+function goToBattle(chalId) {
+  closeModal('chal-vote-modal');
+  // Switch to challenges, battles tab
+  showScr('challenges');
+  chalTab = 'battles';
+  document.querySelectorAll('.ctab').forEach(t => {
+    t.classList.toggle('active', t.dataset.t === 'battles');
+  });
+  initChallenges();
+  // Scroll to the specific battle after it loads
+  setTimeout(() => {
+    const feed = document.querySelector('.battles-feed');
+    if (!feed) return;
+    const cards = feed.querySelectorAll('.battle-card');
+    // Find by chalId stored on card — add data attr when building
+    cards.forEach(card => {
+      if (card.dataset.chalId === chalId) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  }, 800);
+}

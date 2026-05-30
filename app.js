@@ -1,3 +1,7 @@
+window.onerror = function(msg, src, line, col, err) {
+  console.error(err && err.stack ? err.stack : err);
+};
+
 // ═══════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════
@@ -496,6 +500,8 @@ function softShuffle(arr){
 
 function buildPair(chalId,entA,entB,pairIdx){
   const div=document.createElement('div');
+  div.dataset.entryA = entA?.id || '';
+div.dataset.entryB = entB?.id || '';
   div.className='battle-pair';
   div.dataset.pairIdx=pairIdx;
   div.appendChild(buildSide(chalId,entA,'a',pairIdx));
@@ -718,7 +724,7 @@ async function loadPairProgress(chalId,entryAId,entryBId){
 }
 
 // Fix: store entry IDs in pair div
-const _origBuildPair=buildPair;
+/*const _origBuildPair=buildPair;
  function buildPair (chalId,entA,entB,pairIdx){
    console.log('same?', _origBuildPair === buildPair);
 console.log(_origBuildPair);
@@ -727,7 +733,7 @@ console.log(buildPair);
   div.dataset.entryA=entA?.id||'';
   div.dataset.entryB=entB?.id||'';
   return div;
-}
+}*/
 
 // ═══════════════════════════════════
 // ENTRY LIKES

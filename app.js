@@ -103,7 +103,7 @@ async function trackSession(){
     lastSeen:ts(), sessionCount:firebase.firestore.FieldValue.increment(1)
   }).catch(()=>{});
 }
-
+eruda()
 // ═══════════════════════════════════
 // AUTH
 // ═══════════════════════════════════
@@ -199,7 +199,19 @@ function friendlyErr(code){
   const m={'auth/email-already-in-use':'Email already registered.','auth/invalid-email':'Invalid email.','auth/wrong-password':'Wrong password.','auth/user-not-found':'No account found.','auth/weak-password':'Password too short.','auth/too-many-requests':'Too many attempts. Try later.'};
   return m[code]||'Something went wrong.';
 }
-
+function eruda() {
+  if (window.eruda) {
+    eruda.show();
+    return;
+  }
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/eruda';
+  document.body.appendChild(s);
+  s.onload = function() {
+    eruda.init();
+    eruda.show();
+  };
+}
 // ═══════════════════════════════════
 // NAVIGATION
 // ═══════════════════════════════════

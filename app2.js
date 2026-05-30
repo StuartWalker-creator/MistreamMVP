@@ -1,3 +1,7 @@
+window.onerror = function(msg, src, line, col, err) {
+  console.error(err && err.stack ? err.stack : err);
+};
+
 // ═══════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════
@@ -406,7 +410,7 @@ function buildArenaCard(chalId,d){
       <div class="vb-progress" id="vbp-${chalId}"></div>
       <div class="vb-actions">
         <div class="vba-left">
-          <div class="vba-btn" id="join-btn-${chalId}" onclick="openJoin('${chalId}','${esc(d.title||'')}','${esc(d.creatorUsername||'')}','${d.creatorId||''}')">
+          <div class="vba-btn" id="join-btn-${chalId}" onclick="openJoin('${chalId}','${esc(d.title||'')}','${esc(d.creatorUsername||'')}')">
             <i class="fa-solid fa-shield-halved"></i>
             <span>Submit Entry</span>
           </div>
@@ -429,10 +433,9 @@ async function loadBattleground(chalId,d){
   // Fetch entries with personalized ordering:
   // - New entries (last 2h) get a grace window and appear
   // - Then sort by likes desc (virality signal)
-  // Simple query — no composite index needed
-  // Sort client-side to avoid Firestore index requirement
   const snap=await db.collection('entries')
     .where('chalId','==',chalId)
+    .orderBy('createdAt','desc')
     .limit(20)
     .get();
 
@@ -497,10 +500,10 @@ function softShuffle(arr){
 
 function buildPair(chalId,entA,entB,pairIdx){
   const div=document.createElement('div');
+  div.dataset.entryA = entA?.id || '';
+div.dataset.entryB = entB?.id || '';
   div.className='battle-pair';
   div.dataset.pairIdx=pairIdx;
-  div.dataset.entryA=entA?.id||'';
-  div.dataset.entryB=entB?.id||'';
   div.appendChild(buildSide(chalId,entA,'a',pairIdx));
   // VS divider
   const vs=document.createElement('div');
@@ -720,7 +723,17 @@ async function loadPairProgress(chalId,entryAId,entryBId){
     </div>`;
 }
 
-// entry IDs now set directly in buildPair
+// Fix: store entry IDs in pair div
+/*const _origBuildPair=buildPair;
+ function buildPair (chalId,entA,entB,pairIdx){
+   console.log('same?', _origBuildPair === buildPair);
+console.log(_origBuildPair);
+console.log(buildPair);
+  const div=_origBuildPair(chalId,entA,entB,pairIdx);
+  div.dataset.entryA=entA?.id||'';
+  div.dataset.entryB=entB?.id||'';
+  return div;
+}*/
 
 // ═══════════════════════════════════
 // ENTRY LIKES
@@ -835,8 +848,8 @@ async function submitChallenge(){
 // ═══════════════════════════════════
 // JOIN CHALLENGE
 // ═══════════════════════════════════
-function openJoin(chalId,chalTitle,chalCreator,chalCreatorId){
-  joinTarget={chalId,chalTitle,chalCreator,chalCreatorId:chalCreatorId||''};
+function openJoin(chalId,chalTitle,chalCreator){
+  joinTarget={chalId,chalTitle,chalCreator};
   joinSelEntry=null; joinMediaFile=null;
   document.getElementById('join-chal-info').innerHTML=`<div class="jt">${esc(chalTitle||'Challenge')}</div><div class="jm">by ${esc(chalCreator||'')} · Submit your entry to compete</div>`;
   document.getElementById('join-err')?.classList.add('hidden');
@@ -1196,17 +1209,15 @@ async function requestNotifPermission(){
 // ═══════════════════════════════════
 async function checkAndAnnounceWinners(){
   // Called periodically — check ended challenges that haven't been announced
-  // Query only by status, filter expiry client-side
   const snap=await db.collection('challenges')
     .where('status','==','active')
-    .limit(20).get();
+    .where('expiresAt','<=',new Date())
+    .limit(10).get();
   snap.forEach(async doc=>{
     const d=doc.data();
-    // Skip if not actually expired yet
-    if(!d.expiresAt || d.expiresAt.toDate() > new Date()) return;
-    // Get top 3 entries — sort client-side, no index needed
-    const entries=await db.collection('entries').where('chalId','==',doc.id).limit(20).get();
-    const top3=entries.docs.map(e=>({id:e.id,...e.data()})).sort((a,b)=>(b.votes||0)-(a.votes||0)).slice(0,3);
+    // Get top 3 entries by votes
+    const entries=await db.collection('entries').where('chalId','==',doc.id).orderBy('votes','desc').limit(3).get();
+    const top3=entries.docs.map(e=>({id:e.id,...e.data()}));
     const winner=top3[0];
     if(!winner)return;
     // Update challenge as ended with winner
@@ -1247,12 +1258,4 @@ function fmtN(n){n=parseInt(n)||0;if(n>=1000000)return(n/1000000).toFixed(1)+'M'
 function timeAgo(d){const s=Math.floor((Date.now()-d)/1000);if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';if(s<604800)return Math.floor(s/86400)+'d';return d.toLocaleDateString();}
 function timeLeft(d){if(!d)return'';const s=Math.max(0,Math.floor((d-Date.now())/1000));if(s<60)return s+'s left';if(s<3600)return Math.floor(s/60)+'m left';if(s<86400)return Math.floor(s/3600)+'h left';return Math.floor(s/86400)+'d left';}
 function showToast(msg){const old=document.getElementById('toast');if(old)old.remove();const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3200);}
-function setBtnLoad(btn,loading,reset){
-  if(!btn)return;
-  if(loading){
-    btn.innerHTML='<div class="spin" style="width:16px;height:16px;border-color:rgba(255,255,255,.3);border-top-color:#fff;margin:0 auto;"></div>';btn.disabled=true;}
-    else{
-      if(reset)btn.innerHTML=reset;btn.disabled=false;
-    }
-  
-}
+function setBtnLoad(btn,loading,reset){if(!btn)return;if(loading){btn.innerHTML='<div class="spin" style="width:16px;height:16px;border-color:rgba(255,255,255,.3);border-top-color:#fff;margin:0 auto;"></div>';btn.disabled=true;}else{if(reset)btn.innerHTML=reset;btn.disabled=false;}}

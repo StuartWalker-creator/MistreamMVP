@@ -719,7 +719,10 @@ async function loadPairProgress(chalId,entryAId,entryBId){
 
 // Fix: store entry IDs in pair div
 const _origBuildPair=buildPair;
- buildPair = function(chalId,entA,entB,pairIdx){
+ function buildPair (chalId,entA,entB,pairIdx){
+   console.log('same?', _origBuildPair === buildPair);
+console.log(_origBuildPair);
+console.log(buildPair);
   const div=_origBuildPair(chalId,entA,entB,pairIdx);
   div.dataset.entryA=entA?.id||'';
   div.dataset.entryB=entB?.id||'';

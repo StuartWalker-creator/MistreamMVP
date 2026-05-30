@@ -44,24 +44,14 @@ let curPairVids=[];
 // ═══════════════════════════════════
 // INIT
 // ═══════════════════════════════════
-let authHandled = false; // prevents race condition
-
 window.addEventListener('load',()=>{
   if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
   setTimeout(()=>{
     document.getElementById('splash').classList.add('hidden');
     auth.onAuthStateChanged(async user=>{
-      // If doRegister/doLogin already handled this auth event, skip
-      if(authHandled){ authHandled=false; return; }
       if(user){
-        // Retry up to 3 times — Firestore write may not be committed yet
-        let snap = null;
-        for(let i=0;i<3;i++){
-          snap = await db.collection('users').doc(user.uid).get();
-          if(snap.exists) break;
-          await new Promise(r=>setTimeout(r,800));
-        }
-        if(snap && snap.exists){ CU=user; CUD=snap.data(); initApp(); }
+        const snap=await db.collection('users').doc(user.uid).get();
+        if(snap.exists){ CU=user; CUD=snap.data(); initApp(); }
         else{ showAuth(); sv('v-register'); }
       } else { showAuth(); sv('v-login'); }
     });
@@ -150,17 +140,7 @@ async function doRegister(){
       profileViews:0, followers:0, following:0, sessionCount:0,
       createdAt:ts()
     });
-    // Set CU and CUD directly — don't wait for onAuthStateChanged
-    CU = cred.user;
-    CUD = {
-      uid:cred.user.uid, displayName:name, username, niche:'comedy',
-      email, photoURL, bio:'', challengeWins:0, challengeLosses:0,
-      challengesCreated:0, challengesJoined:0, totalVotesReceived:0,
-      profileViews:0, followers:0, following:0, sessionCount:0
-    };
-    authHandled = true; // block onAuthStateChanged from redirecting to register
     showAuthSuccess(`Welcome, ${name}!`,`Your identity ${username} is live.`);
-    setTimeout(()=>initApp(), 1200);
   }catch(e){
     showErr(err,friendlyErr(e.code));
     setBtnLoad(btn,false,'<span>Claim My Identity</span><i class="fa-solid fa-arrow-right"></i>');
@@ -173,14 +153,8 @@ async function doLogin(){
   if(!email||!pass){showErr(err,'Fill in all fields.');return;}
   const btn=document.getElementById('l-btn'); setBtnLoad(btn,true);
   try{
-    const cred = await auth.signInWithEmailAndPassword(email,pass);
-    const snap = await db.collection('users').doc(cred.user.uid).get();
-    if(!snap.exists){ showErr(err,'Account data not found. Try signing up.'); setBtnLoad(btn,false,'<span>Sign In</span><i class="fa-solid fa-arrow-right"></i>'); return; }
-    CU = cred.user;
-    CUD = snap.data();
-    authHandled = true; // block onAuthStateChanged
+    await auth.signInWithEmailAndPassword(email,pass);
     showAuthSuccess('Welcome back!','Taking you to the arena...');
-    setTimeout(()=>initApp(), 1200);
   }catch(e){
     showErr(err,friendlyErr(e.code));
     setBtnLoad(btn,false,'<span>Sign In</span><i class="fa-solid fa-arrow-right"></i>');
@@ -225,30 +199,13 @@ function goBack(){
 // CLOUDINARY + THUMBNAIL
 // ═══════════════════════════════════
 async function uploadCLD(file,folder){
-  const isVideo = file.type.startsWith('video/');
-  // Use specific endpoint — video or image, not auto
-  // auto endpoint rejects large video files on free tier
-  const resourceType = isVideo ? 'video' : 'image';
   const fd=new FormData();
-  fd.append('file',file);
-  fd.append('upload_preset',CLD_PRESET);
+  fd.append('file',file); fd.append('upload_preset',CLD_PRESET);
   fd.append('folder',`mistream/${folder}`);
-  // Cloudinary free tier has 10MB limit on unsigned uploads for video
-  // Check size and warn
-  if(isVideo && file.size > 100*1024*1024){
-    throw new Error('Video too large. Please use a video under 100MB.');
-  }
-  const res=await fetch(
-    `https://api.cloudinary.com/v1_1/${CLD_CLOUD}/${resourceType}/upload`,
-    {method:'POST',body:fd}
-  );
-  if(!res.ok){
-    const text=await res.text();
-    throw new Error(`Upload failed (${res.status}): ${text.substring(0,100)}`);
-  }
+  const res=await fetch(`https://api.cloudinary.com/v1_1/${CLD_CLOUD}/auto/upload`,{method:'POST',body:fd});
   const data=await res.json();
   if(data.error) throw new Error(data.error.message);
-  return {url:data.secure_url, type:isVideo?'video':'image'};
+  return {url:data.secure_url, type:file.type.startsWith('video/')?'video':'image'};
 }
 async function genThumb(videoFile){
   return new Promise(resolve=>{
@@ -268,46 +225,17 @@ async function genThumb(videoFile){
   });
 }
 async function uploadWithThumb(file,folder){
-  const isVideo=file.type.startsWith('video/');
-  if(isVideo){
-    // Generate thumbnail first (client-side, fast)
-    showUploadProgress('Preparing video...',10);
+  const res=await uploadCLD(file,folder);
+  let thumbURL=null;
+  if(res.type==='video'){
     const blob=await genThumb(file);
-    showUploadProgress('Uploading video (this may take a minute)...',30);
-    const res=await uploadCLD(file,folder);
-    showUploadProgress('Saving thumbnail...',85);
-    let thumbURL=null;
     if(blob){
       const tf=new File([blob],'thumb.jpg',{type:'image/jpeg'});
       const tr=await uploadCLD(tf,`thumbs/${CU.uid}`);
       thumbURL=tr.url;
     }
-    hideUploadProgress();
-    return {...res,thumbURL};
-  } else {
-    showUploadProgress('Uploading image...',50);
-    const res=await uploadCLD(file,folder);
-    hideUploadProgress();
-    return {...res,thumbURL:null};
   }
-}
-
-function showUploadProgress(msg,pct){
-  let bar=document.getElementById('upload-progress-bar');
-  if(!bar){
-    bar=document.createElement('div');
-    bar.id='upload-progress-bar';
-    bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(6,6,8,.95);padding:12px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--bord);';
-    bar.innerHTML=`<div class="spin" style="width:16px;height:16px;flex-shrink:0;"></div><div style="flex:1;"><div id="upg-msg" style="font-family:Space Mono,monospace;font-size:10px;color:rgba(255,255,255,.7);margin-bottom:5px;"></div><div style="height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;"><div id="upg-fill" style="height:100%;background:linear-gradient(90deg,var(--or),var(--go));border-radius:2px;transition:width .4s ease;"></div></div></div>`;
-    document.body.appendChild(bar);
-  }
-  document.getElementById('upg-msg').textContent=msg;
-  document.getElementById('upg-fill').style.width=pct+'%';
-}
-
-function hideUploadProgress(){
-  const bar=document.getElementById('upload-progress-bar');
-  if(bar){ bar.style.opacity='0'; bar.style.transition='opacity .3s'; setTimeout(()=>bar.remove(),400); }
+  return {...res,thumbURL};
 }
 
 // ═══════════════════════════════════

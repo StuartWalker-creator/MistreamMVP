@@ -162,7 +162,7 @@ html,body{height:100%;overflow:hidden;font-family:'Syne',sans-serif;background:v
 .bs-grad{position:absolute;bottom:0;left:0;right:0;height:55%;background:linear-gradient(to top,rgba(0,0,0,.9),transparent);z-index:3;pointer-events:none;}
 .bs-mute{position:absolute;top:4px;right:4px;z-index:10;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;cursor:pointer;}
 .bs-mute i{font-size:10px;color:#fff;}
-.bs-info{position:absolute;bottom:0;left:0;right:0;z-index:4;padding:0px;}
+.bs-info{position:absolute;bottom:0;left:5px;right:0;z-index:4;padding:0px;}
 .bs-author{display:flex;align-items:center;gap:4px;margin-bottom:4px;cursor:pointer;}
 .bs-av{width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,var(--or),var(--go));display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:9px;color:#fff;flex-shrink:0;overflow:hidden;}
 .bs-av img{width:100%;height:100%;object-fit:cover;}

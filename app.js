@@ -200,10 +200,10 @@ function friendlyErr(code){
 }
 // ═══════════════════════════════════
 // NAVIGATION
-// ═══════════════════════════════════
+// ═══════════════════════════════════ 
 function showScr(name){
   prevScr=curScr; curScr=name;
-  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('active')); 
   document.querySelectorAll('.bn').forEach(b=>b.classList.remove('active'));
   const scr=document.getElementById(`scr-${name}`);
   if(scr) scr.classList.add('active');
@@ -398,8 +398,8 @@ function buildArenaCard(chalId,d){
     <div class="vote-bar" id="vb-${chalId}">
       <div class="vb-swipe-hint" id="vsh-${chalId}">← swipe to compare more entries →</div>
       <div class="vb-row">
-        <button class="vbtn vbtn-a" id="va-${chalId}" onclick="castVote('${chalId}','a',this)">Left is funnier</button>
-        <button class="vbtn vbtn-b" id="vb2-${chalId}" onclick="castVote('${chalId}','b',this)">Right is funnier</button>
+        <button class="vbtn vbtn-a" id="va-${chalId}" onclick="castVote('${chalId}','a',this)">Vote Left</button>
+        <button class="vbtn vbtn-b" id="vb2-${chalId}" onclick="castVote('${chalId}','b',this)">Vote Right</button>
       </div>
       <div class="vb-progress" id="vbp-${chalId}"></div>
       <div class="vb-actions">
@@ -479,7 +479,12 @@ async function loadBattleground(chalId,d){
 
   // Check if user already voted on current pair
   await checkPairVoted(chalId,pairs[0],0);
-}
+  // Autoplay first video when battleground first loads
+setTimeout(() => autoplayFirstVid(chalId, 0), 500);
+// Update vote button labels for first pair immediately
+setTimeout(() => {
+  if (pairs[0]) onSwiperScroll(chalId, document.getElementById(`bs-${chalId}`), pairs);
+}, 600);}
 
 function softShuffle(arr){
   // Soft shuffle — not fully random, preserves some weight order
@@ -500,11 +505,7 @@ function buildPair(chalId,entA,entB,pairIdx){
   div.dataset.entryA=entA?.id||'';
   div.dataset.entryB=entB?.id||'';
   div.appendChild(buildSide(chalId,entA,'a',pairIdx));
-  // VS divider
-  const vs=document.createElement('div');
-  vs.className='vs-divider';
-  vs.innerHTML='<div class="vs-pill">VS</div>';
-  div.appendChild(vs);
+  
   div.appendChild(buildSide(chalId,entB,'b',pairIdx));
   return div;
 }
@@ -527,12 +528,13 @@ function buildSide(chalId,entry,side,pairIdx){
   let mediaHTML='';
   if(entry.mediaURL){
     if(isVideo){
-      mediaHTML=`
+mediaHTML = `
         ${thumb?`<img class="bs-thumb" id="thumb-${sideId}" src="${thumb}"/>`:''}
         <video class="bs-video" id="vid-${sideId}" src="${entry.mediaURL}"
-          playsinline muted loop preload="auto"
+          playsinline muted preload="auto"
           style="display:none;"
-          onclick="toggleVidPlay('${sideId}')">
+          onclick="toggleVidPlay('${sideId}')"
+          onended="onVidEnded('${chalId}','${side}',${pairIdx})">
         </video>
         <div class="bs-play-btn" id="play-${sideId}"><i class="fa-solid fa-play"></i></div>
         <div class="bs-mute" onclick="toggleArenaMute(event,'${sideId}')"><i class="fa-solid ${isMuted?'fa-volume-xmark':'fa-volume-high'}"></i></div>`;
@@ -583,16 +585,79 @@ function buildSide(chalId,entry,side,pairIdx){
 }
 
 function playVid(sideId, side, chalId, pairIdx){
-  const vid=document.getElementById(`vid-${sideId}`);
-  const thumb=document.getElementById(`thumb-${sideId}`);
-  const playBtn=document.getElementById(`play-${sideId}`);
-  if(!vid)return;
-  // Show video, hide thumbnail
-  if(thumb) thumb.style.display='none';
-  vid.style.display='block';
-  vid.muted=isMuted;
-  if(vid.paused){ vid.play().catch(()=>{}); if(playBtn)playBtn.classList.add('gone'); }
-  else { vid.pause(); if(playBtn)playBtn.classList.remove('gone'); }
+  const vid = document.getElementById(`vid-${sideId}`);
+  const thumb = document.getElementById(`thumb-${sideId}`);
+  const playBtn = document.getElementById(`play-${sideId}`);
+  if(!vid) return;
+
+  // Find the pair and both sides
+  const pair = vid.closest('.battle-pair');
+  const allSides = pair ? pair.querySelectorAll('.battle-side') : [];
+
+  // Show video, hide thumbnail on this side
+  if(thumb) thumb.style.display = 'none';
+  vid.style.display = 'block';
+  vid.muted = isMuted;
+
+  if(vid.paused){
+    // Pause any other playing video in this pair first
+    allSides.forEach(s => {
+      const otherVid = s.querySelector('.bs-video');
+      if(otherVid && otherVid !== vid && !otherVid.paused){
+        otherVid.pause();
+        s.classList.remove('playing');
+        // Shrink the paused side
+      }
+    });
+    // Expand and play this side
+    const thisSide = vid.closest('.battle-side');
+    if(thisSide){
+      thisSide.classList.add('playing');
+      thisSide.style.height = '';
+      thisSide.style.minHeight = '300px';
+    }
+// Expand playing side in both width and height
+    if(pair){
+      pair.classList.remove('left-big','right-big');
+      pair.classList.add(side==='a' ? 'left-big' : 'right-big');
+    }    // Show actions on playing side, hide on others
+    allSides.forEach(s => {
+      const acts = s.querySelector('.bs-actions');
+      if(acts) acts.style.opacity = s === vid.closest('.battle-side') ? '1' : '0';
+    });
+    vid.play().catch(()=>{});
+    if(playBtn) playBtn.classList.add('gone');
+  } else {
+    // Pause this video
+    vid.pause();
+    const thisSide = vid.closest('.battle-side');
+    if(thisSide){
+      thisSide.classList.remove('playing');
+      thisSide.style.height = '160px';
+      thisSide.style.minHeight = '160px';
+    }
+    if(playBtn) playBtn.classList.remove('gone');
+    // Hide actions
+    const acts = thisSide?.querySelector('.bs-actions');
+    if(acts) acts.style.opacity = '0';
+  }
+}
+function onVidEnded(chalId, side, pairIdx) {
+  // When left video ends, play right. When right ends, play left.
+  const nextSide = side === 'a' ? 'b' : 'a';
+  const nextSideId = `${chalId}-${nextSide}-${pairIdx}`;
+  const nextVid = document.getElementById(`vid-${nextSideId}`);
+  if (!nextVid) return;
+  playVid(nextSideId, nextSide, chalId, pairIdx);
+}
+
+function autoplayFirstVid(chalId, pairIdx) {
+  // Called when a pair scrolls into view — plays the left video automatically
+  const sideId = `${chalId}-a-${pairIdx}`;
+  const vid = document.getElementById(`vid-${sideId}`);
+  if (!vid) return;
+  // Small delay to let layout settle
+  setTimeout(() => playVid(sideId, 'a', chalId, pairIdx), 300);
 }
 
 function toggleVidPlay(sideId){
@@ -623,6 +688,8 @@ function buildPairIndicator(chalId,total){
 
 function onSwiperScroll(chalId,swiper,pairs){
   const idx=Math.round(swiper.scrollLeft/swiper.offsetWidth);
+  // Autoplay first video of newly visible pair
+autoplayFirstVid(chalId, idx);
   // Update dots
   document.querySelectorAll(`[id^="pid-${chalId}-"]`).forEach((d,i)=>d.classList.toggle('active',i===idx));
   // Update swipe hint
@@ -640,26 +707,32 @@ function onSwiperScroll(chalId,swiper,pairs){
   if(pa&&btnA&&btnB){
     const nameA=pa[0]?esc(pa[0].authorName||'Left'):'Left';
     const nameB=pa[1]?esc(pa[1].authorName||'Right'):'Right';
-    btnA.textContent=pa[0]?`${nameA} is funnier`:'Left is funnier';
-    btnB.textContent=pa[1]?`${nameB} is funnier`:'Right is funnier';
+    btnA.textContent=pa[0]?`Vote ${nameA}`:'Vote Left';
+    btnB.textContent=pa[1]?`Vote ${nameB}`:'Vote Right';
     btnA.disabled=!pa[0]; btnB.disabled=!pa[1];
   }
 }
 
 async function checkPairVoted(chalId,pair,pairIdx){
   if(!pair||!pair[0]) return;
-  // Check if user already voted on either entry in this pair
   const voteRef=db.collection('challengeVotes').doc(`${CU.uid}_${chalId}_${pairIdx}`);
   const snap=await voteRef.get();
   const btnA=document.getElementById(`va-${chalId}`);
   const btnB=document.getElementById(`vb2-${chalId}`);
-  if(snap.exists){
-    const side=snap.data().side;
-    if(btnA){btnA.disabled=true;if(side==='a'){btnA.className='vbtn voted';btnA.textContent='✓ Your Vote';}}
-    if(btnB){btnB.disabled=true;if(side==='b'){btnB.className='vbtn voted';btnB.textContent='✓ Your Vote';}}
-    // Update progress bars
-    if(pair[0]&&pair[1]) loadPairProgress(chalId,pair[0].id,pair[1].id);
+  if(!snap.exists) return;
+  const {votedEntryId,entryAId,entryBId} = snap.data();
+  // Determine which button to mark based on which entry is currently on which side
+  // pair[0] is current left entry, pair[1] is current right entry
+  const votedSide = pair[0]?.id===votedEntryId ? 'a' : 'b';
+  if(btnA){
+    btnA.disabled=true;
+    if(votedSide==='a'){btnA.className='vbtn voted';btnA.textContent='✓ Your Vote';}
   }
+  if(btnB){
+    btnB.disabled=true;
+    if(votedSide==='b'){btnB.className='vbtn voted';btnB.textContent='✓ Your Vote';}
+  }
+  if(pair[0]&&pair[1]) loadPairProgress(chalId,pair[0].id,pair[1].id);
 }
 
 async function castVote(chalId,side,btn){
@@ -676,18 +749,19 @@ async function castVote(chalId,side,btn){
   if(!pair)return;
   const sides=pair.querySelectorAll('.battle-side');
   // Get entry IDs from the like button IDs
-  const getEntryId=(sideEl)=>{
+  /*const getEntryId=(sideEl)=>{
     const likeBtn=sideEl.querySelector('[id^="like-act-"]');
     if(!likeBtn)return null;
     const sideId=likeBtn.id.replace('like-act-','');
     // sideId format: chalId-side-pairIdx
     return null; // We'll use data attribute instead
-  };
+  };*/
   // Store entry IDs in pair div as data attributes when building
   const entryAId=pair.dataset.entryA;
   const entryBId=pair.dataset.entryB;
-  await voteRef.set({chalId,pairIdx,side,entryAId,entryBId,userId:CU.uid,createdAt:ts()});
-  await db.collection('challenges').doc(chalId).update({totalVotes:firebase.firestore.FieldValue.increment(1)});
+const votedEntryId = side === 'a' ? entryAId : entryBId;
+await voteRef.set({ chalId, pairIdx, side, entryAId, entryBId, votedEntryId, userId: CU.uid, createdAt: ts() });
+await db.collection('challenges').doc(chalId).update({totalVotes:firebase.firestore.FieldValue.increment(1)});
   // Increment voted entry's vote count
   if(side==='a'&&entryAId) await db.collection('entries').doc(entryAId).update({votes:firebase.firestore.FieldValue.increment(1)});
   if(side==='b'&&entryBId) await db.collection('entries').doc(entryBId).update({votes:firebase.firestore.FieldValue.increment(1)});
@@ -1245,12 +1319,13 @@ function fmtN(n){n=parseInt(n)||0;if(n>=1000000)return(n/1000000).toFixed(1)+'M'
 function timeAgo(d){const s=Math.floor((Date.now()-d)/1000);if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';if(s<604800)return Math.floor(s/86400)+'d';return d.toLocaleDateString();}
 function timeLeft(d){if(!d)return'';const s=Math.max(0,Math.floor((d-Date.now())/1000));if(s<60)return s+'s left';if(s<3600)return Math.floor(s/60)+'m left';if(s<86400)return Math.floor(s/3600)+'h left';return Math.floor(s/86400)+'d left';}
 function showToast(msg){const old=document.getElementById('toast');if(old)old.remove();const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3200);}
-function setBtnLoad(btn,loading,reset){
-  if(!btn)return;
-  if(loading){
-    btn.innerHTML='<div class="spin" style="width:16px;height:16px;border-color:rgba(255,255,255,.3);border-top-color:#fff;margin:0 auto;"></div>';btn.disabled=true;}
-    else{
-      if(reset)btn.innerHTML=reset;btn.disabled=false;
-    }
-  
+function setBtnLoad(btn, loading, reset) {
+  if (!btn) return;
+  if (loading) {
+    btn.innerHTML = '<div class="spin" style="width:16px;height:16px;border-color:rgba(255,255,255,.3);border-top-color:#fff;margin:0 auto;"></div>';
+    btn.disabled = true;
+  } else {
+    if (reset) btn.innerHTML = reset;
+    btn.disabled = false;
+  }
 }

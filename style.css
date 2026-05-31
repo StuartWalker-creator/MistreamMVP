@@ -123,7 +123,7 @@ html,body{height:100%;overflow:hidden;font-family:'Syne',sans-serif;background:v
 .ac-top{padding:1ppx 12px 0;}
 .ac-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;}
 .ac-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1.2px;color:#fff;line-height:1.1;flex:1;padding-right:8px;}
-.ac-badge{background:rgba(255,48,96,.15);border:1px solid rgba(255,48,96,.3);padding:3px 10px;border-radius:20px;display:flex;align-items:center;gap:5px;flex-shrink:0;animation:liveGlow 2s ease infinite;}
+.ac-badge{background:rgba(255,48,96,.15);border:1px solid rgba(255,48,96,.3);padding:3px 10px;border-radius:20px;left:35px;display:flex;align-items:center;gap:5px;flex-shrink:0;animation:liveGlow 2s ease infinite;}
 .ac-badge-dot{width:5px;height:5px;border-radius:50%;background:var(--re);animation:pulse 1s ease infinite;}
 .ac-badge-txt{font-family:'Space Mono',monospace;font-size:8px;color:var(--re);font-weight:700;letter-spacing:.5px;}
 .ac-ended-badge{background:rgba(136,136,160,.1);border:1px solid rgba(136,136,160,.2);padding:3px 10px;border-radius:20px;flex-shrink:0;}
@@ -141,10 +141,10 @@ html,body{height:100%;overflow:hidden;font-family:'Syne',sans-serif;background:v
 .ac-meta-chip.timer i{color:var(--go);}
 
 /* BATTLEGROUND */
-.battleground{flex:1;position:relative;overflow:hidden;min-height:300px;}
-.battle-swiper{display:flex;height:100%;min-height:300px;overflow-x:scroll;scroll-snap-type:x mandatory;scrollbar-width:none;}
+.battleground{flex:1;position:relative;overflow:hidden;min-height:250px;}
+.battle-swiper{display:flex;height:100%;min-height:250px;overflow-x:scroll;scroll-snap-type:x mandatory;scrollbar-width:none;}
 .battle-swiper::-webkit-scrollbar{display:none;}
-.battle-pair{width:100%;flex-shrink:0;scroll-snap-align:start;display:grid;grid-template-columns:1fr 1fr;gap:4px;position:relative;height:100%;min-height:300px;transition:grid-template-columns .35s ease;}
+.battle-pair{width:100%;flex-shrink:0;scroll-snap-align:start;display:grid;grid-template-columns:1fr 1fr;gap:4px;position:relative;height:100%;min-height:250px;transition:grid-template-columns .35s ease;}
 /*.battle-pair.left-big{grid-template-columns:7fr 3fr;}
 .battle-pair.right-big{grid-template-columns:3fr 7fr;}*/
 

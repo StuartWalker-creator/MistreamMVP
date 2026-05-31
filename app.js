@@ -379,7 +379,6 @@ function buildArenaCard(chalId,d){
     <div class="ac-top">
       <div class="ac-hdr">
         <div class="ac-title">${esc(d.title||'Untitled')}</div>
-        ${badgeHTML}
       </div>
       ${d.description?`<div class="ac-desc">${esc(d.description)}</div>`:''}
       <div class="ac-creator" onclick="viewProfile('${d.creatorId}')">
@@ -390,6 +389,7 @@ function buildArenaCard(chalId,d){
         <div class="ac-meta-chip timer"><i class="fa-regular fa-clock"></i>${isEnded?'Ended':timeLeft(d.expiresAt?.toDate())}</div>
         <div class="ac-meta-chip"><i class="fa-solid fa-users"></i>${fmtN(tot)} entries</div>
         <div class="ac-meta-chip"><i class="fa-regular fa-thumbs-up"></i>${fmtN(votes)} votes</div>
+        ${badgeHTML}
       </div>
     </div>
     <div class="battleground" id="bg-${chalId}">
@@ -533,7 +533,7 @@ mediaHTML = `
         <video class="bs-video" id="vid-${sideId}" src="${entry.mediaURL}"
           playsinline muted preload="auto"
           style="display:none;"
-          onclick="toggleVidPlay('${sideId}')"
+          "
           onended="onVidEnded('${chalId}','${side}',${pairIdx})">
         </video>
         <div class="bs-play-btn" id="play-${sideId}"><i class="fa-solid fa-play"></i></div>
@@ -584,90 +584,92 @@ mediaHTML = `
   return div;
 }
 
-function playVid(sideId, side, chalId, pairIdx){
+function playVid(sideId, side, chalId, pairIdx) {
   const vid = document.getElementById(`vid-${sideId}`);
   const thumb = document.getElementById(`thumb-${sideId}`);
   const playBtn = document.getElementById(`play-${sideId}`);
-  if(!vid) return;
-
-  // Find the pair and both sides
-  const pair = vid.closest('.battle-pair');
-  const allSides = pair ? pair.querySelectorAll('.battle-side') : [];
-
-  // Show video, hide thumbnail on this side
-  if(thumb) thumb.style.display = 'none';
+  if (!vid) return;
+  
+  // Always show video, hide thumbnail
+  if (thumb) thumb.style.display = 'none';
   vid.style.display = 'block';
   vid.muted = isMuted;
-
-  if(vid.paused){
-    // Pause any other playing video in this pair first
-    allSides.forEach(s => {
-      const otherVid = s.querySelector('.bs-video');
-      if(otherVid && otherVid !== vid && !otherVid.paused){
-        otherVid.pause();
-        s.classList.remove('playing');
-        // Shrink the paused side
+  
+  // Pause other video in this pair
+  const pair = vid.closest('.battle-pair');
+  if (pair) {
+    pair.querySelectorAll('.bs-video').forEach(v => {
+      if (v !== vid && !v.paused) {
+        v.pause();
+        const otherPlay = v.closest('.battle-side')?.querySelector('.bs-play-btn');
+        if (otherPlay) otherPlay.classList.remove('gone');
       }
     });
-    // Expand and play this side
-    const thisSide = vid.closest('.battle-side');
-    if(thisSide){
-      thisSide.classList.add('playing');
-      thisSide.style.height = '';
-      thisSide.style.minHeight = '300px';
-    }
-// Expand playing side in both width and height
-    if(pair){
-      pair.classList.remove('left-big','right-big');
-      pair.classList.add(side==='a' ? 'left-big' : 'right-big');
-    }    // Show actions on playing side, hide on others
-    allSides.forEach(s => {
+  }
+  
+  // Play and update button
+  vid.play().catch(() => {});
+  if (playBtn) playBtn.classList.add('gone');
+  
+  // Show actions on this side
+  if (pair) {
+    pair.querySelectorAll('.battle-side').forEach(s => {
       const acts = s.querySelector('.bs-actions');
-      if(acts) acts.style.opacity = s === vid.closest('.battle-side') ? '1' : '0';
+      if (acts) acts.style.opacity = s.contains(vid) ? '1' : '0';
     });
-    vid.play().catch(()=>{});
-    if(playBtn) playBtn.classList.add('gone');
-  } else {
-    // Pause this video
-    vid.pause();
-    const thisSide = vid.closest('.battle-side');
-    if(thisSide){
-      thisSide.classList.remove('playing');
-      thisSide.style.height = '160px';
-      thisSide.style.minHeight = '160px';
-    }
-    if(playBtn) playBtn.classList.remove('gone');
-    // Hide actions
-    const acts = thisSide?.querySelector('.bs-actions');
-    if(acts) acts.style.opacity = '0';
   }
 }
+
 function onVidEnded(chalId, side, pairIdx) {
-  // When left video ends, play right. When right ends, play left.
   const nextSide = side === 'a' ? 'b' : 'a';
   const nextSideId = `${chalId}-${nextSide}-${pairIdx}`;
-  const nextVid = document.getElementById(`vid-${nextSideId}`);
-  if (!nextVid) return;
-  playVid(nextSideId, nextSide, chalId, pairIdx);
+  const vid = document.getElementById(`vid-${nextSideId}`);
+  const thumb = document.getElementById(`thumb-${nextSideId}`);
+  const playBtn = document.getElementById(`play-${nextSideId}`);
+  if (!vid) return;
+  if (thumb) thumb.style.display = 'none';
+  vid.style.display = 'block';
+  vid.muted = isMuted;
+  vid.play().catch(() => {});
+  if (playBtn) playBtn.classList.add('gone');
 }
-
 function autoplayFirstVid(chalId, pairIdx) {
-  // Called when a pair scrolls into view — plays the left video automatically
   const sideId = `${chalId}-a-${pairIdx}`;
   const vid = document.getElementById(`vid-${sideId}`);
+  const thumb = document.getElementById(`thumb-${sideId}`);
+  const playBtn = document.getElementById(`play-${sideId}`);
   if (!vid) return;
-  // Small delay to let layout settle
-  setTimeout(() => playVid(sideId, 'a', chalId, pairIdx), 300);
+  setTimeout(() => {
+    // Show video, hide thumbnail
+    if (thumb) thumb.style.display = 'none';
+    vid.style.display = 'block';
+    vid.muted = isMuted;
+    // Use play() directly — don't go through playVid to avoid the paused check
+    vid.play().catch(() => {});
+    if (playBtn) playBtn.classList.add('gone');
+    // Show actions on left side
+    const pair = vid.closest('.battle-pair');
+    if (pair) {
+      pair.querySelectorAll('.battle-side').forEach(s => {
+        const acts = s.querySelector('.bs-actions');
+        if (acts) acts.style.opacity = s.contains(vid) ? '1' : '0';
+      });
+    }
+  }, 400);
 }
-
-function toggleVidPlay(sideId){
-  const vid=document.getElementById(`vid-${sideId}`);
-  const playBtn=document.getElementById(`play-${sideId}`);
-  if(!vid)return;
-  if(vid.paused){ vid.play().catch(()=>{}); if(playBtn)playBtn.classList.add('gone'); }
-  else{ vid.pause(); if(playBtn)playBtn.classList.remove('gone'); }
+function toggleVidPlay(sideId) {
+  const vid = document.getElementById(`vid-${sideId}`);
+  const playBtn = document.getElementById(`play-${sideId}`);
+  if (!vid) return;
+  // Stop event reaching the side div
+  if (vid.paused) {
+    vid.play().catch(() => {});
+    if (playBtn) playBtn.classList.add('gone');
+  } else {
+    vid.pause();
+    if (playBtn) playBtn.classList.remove('gone');
+  }
 }
-
 function toggleArenaMute(e,sideId){
   e.stopPropagation();
   isMuted=!isMuted;

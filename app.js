@@ -632,7 +632,18 @@ function onVidEnded(chalId, side, pairIdx) {
   vid.muted = isMuted;
   vid.play().catch(() => {});
   if (playBtn) playBtn.classList.add('gone');
+  const pair = vid.closest('.battle-pair');
+  
+    if (pair) {
+    pair.querySelectorAll('.battle-side').forEach(s => {
+      const acts = s.querySelector('.bs-actions');
+      if (acts) acts.style.opacity = s.contains(vid) ? '1' : '0';
+    });
+  }
+
+
 }
+
 function autoplayFirstVid(chalId, pairIdx) {
   const sideId = `${chalId}-a-${pairIdx}`;
   const vid = document.getElementById(`vid-${sideId}`);

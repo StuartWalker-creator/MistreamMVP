@@ -345,13 +345,33 @@ function initArena(){
     },err=>console.error(err));
 }
 
-function setupArenaObserver(){
+/*function setupArenaObserver(){
   // Autoplay video for the visible arena card
   const obs=new IntersectionObserver(entries=>{
     entries.forEach(e=>{
       // Pause all videos in cards going out of view
       if(!e.isIntersecting){
         e.target.querySelectorAll('video').forEach(v=>{v.pause();v.currentTime=0;});
+      }
+    });
+  },{threshold:0.6});
+  document.querySelectorAll('.arena-card').forEach(c=>obs.observe(c));
+}*/
+
+function setupArenaObserver(){
+  const obs=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{
+      if(!e.isIntersecting){
+        // Card left view — pause all videos
+        e.target.querySelectorAll('video').forEach(v=>{v.pause();});
+      } else {
+        // Card came back into view — resume the video that was playing
+        // Find whichever video is visible (not display:none) and was playing
+        e.target.querySelectorAll('video').forEach(v=>{
+          if(v.style.display !== 'none' && v.readyState >= 2){
+            v.play().catch(()=>{});
+          }
+        });
       }
     });
   },{threshold:0.6});

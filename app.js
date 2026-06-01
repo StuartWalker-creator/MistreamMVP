@@ -583,7 +583,7 @@ mediaHTML = `
           <i class="fa-regular fa-heart" id="like-ico-${sideId}"></i>
           <span id="like-cnt-${sideId}">${fmtN(entry.likes||0)}</span>
         </div>
-        <div class="bs-act" onclick="openComments('entries','${entry.id}')">
+       <div class="bs-act" onclick="openComments('entries','${entry.id}','${esc(entry.authorName||'')}','${entry.thumbURL||entry.mediaURL||''}')">
           <i class="fa-regular fa-comment-dots"></i>
           <span>${fmtN(entry.commentCount||0)}</span>
         </div>
@@ -1193,7 +1193,7 @@ async function toggleFollow(uid,btn){
 // ═══════════════════════════════════
 // COMMENTS
 // ═══════════════════════════════════
-function openComments(collection,docId){
+function openComments(collection, docId, authorName, thumbURL){
   comTarget={collection,docId};
   document.getElementById('cs-overlay').classList.remove('hidden');
   document.body.style.overflow='hidden';
@@ -1201,9 +1201,18 @@ function openComments(collection,docId){
   if(av) av.innerHTML=CUD.photoURL?`<img src="${CUD.photoURL}"/>`:(CUD.displayName||'?').charAt(0).toUpperCase();
   document.getElementById('cs-text').value='';
   document.getElementById('cs-send').disabled=true;
+  // Update header with entry context
+  const hdr=document.getElementById('cs-entry-context');
+  if(hdr){
+    if(authorName||thumbURL){
+      hdr.innerHTML=`${authorName?`<span style="font-family:'Space Mono',monospace;font-size:12px;color:var(--or);font-weight:700;">${esc(authorName)}</span>`:''}${thumbURL?`<img src="${thumbURL}" style="width:32px;height:40px;object-fit:cover;border-radius:4px;margin-left:8px;flex-shrink:0;"/>`:''}`;
+      hdr.classList.remove('hidden');
+    } else {
+      hdr.classList.add('hidden');
+    }
+  }
   loadComments();
-}
-function closeComments(){
+}function closeComments(){
   comTarget=null;
   if(comUnsub){comUnsub();comUnsub=null;}
   document.getElementById('cs-overlay').classList.add('hidden');

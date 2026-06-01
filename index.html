@@ -209,10 +209,13 @@
     <div class="cs-backdrop" onclick="closeComments()"></div>
     <div class="cs-panel">
       <div class="cs-drag"></div>
-      <div class="cs-hdr">
-        <h3><i class="fa-regular fa-comment-dots"></i> Comments <span id="cs-count"></span></h3>
-        <button onclick="closeComments()"><i class="fa-solid fa-xmark"></i></button>
-      </div>
+<div class="cs-hdr">
+  <div style="display:flex;justify-content:space-between; align-items:center;flex:1;min-width:0;">
+    <h3><i class="fa-regular fa-comment-dots"></i> Comments <span id="cs-count"></span></h3>
+    <div id="cs-entry-context" class="hidden" style="display:flex;align-items:center;"></div>
+  </div>
+  <button onclick="closeComments()"><i class="fa-solid fa-xmark"></i></button>
+</div>
       <div id="cs-list" class="cs-list"></div>
       <div class="cs-input">
         <div class="com-av-sm" id="cs-av"></div>

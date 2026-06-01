@@ -1072,9 +1072,9 @@ async function initProfile(uid,isOwn,container){
     <i class="fa-solid fa-chevron-right" style="font-size:12px;color:var(--mu2);margin-left:auto;"></i>
   </button>
 </div>`
-        :`<div class="prof-acts"><button class="prof-follow-btn" id="pfb-${uid}" onclick="toggleFollow('${uid}',this)">Follow</button></div>`
+        :`<div class="prof-acts"><button class="prof-follow-btn" id="pfb-${uid}" onclick="toggleFollow('${uid}',this)">Support</button></div>`
       }
-      ${!isOwn?`<div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--mu);margin-bottom:14px;">${fmtN(u.profileViews||0)} profile views</div>`:''}
+      ${isOwn?`<div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--mu);margin-bottom:14px;">${fmtN(u.profileViews||0)} profile views</div>`:''}
       <div class="prof-tabs">
         <button class="ptab-btn active" onclick="setProfTab(this,'created','${uid}')">Challenges Created</button>
         <button class="ptab-btn" onclick="setProfTab(this,'joined','${uid}')">Challenges Joined</button>
@@ -1085,7 +1085,7 @@ async function initProfile(uid,isOwn,container){
   if(!isOwn){
     db.collection('follows').doc(`${CU.uid}_${uid}`).get().then(s=>{
       const btn=document.getElementById(`pfb-${uid}`);
-      if(s.exists&&btn){btn.textContent='Following';btn.classList.add('flw');}
+      if(s.exists&&btn){btn.textContent='Supporting';btn.classList.add('flw');}
     });
   }
 }
@@ -1144,6 +1144,8 @@ function scrollToChallenge(chalId){
 
 async function viewProfile(uid){
   if(uid===CU.uid){showScr('profile');return;}
+    history.pushState({screen:'viewprofile'},'','');
+
   prevScr=curScr; curScr='viewprofile';
   document.querySelectorAll('.scr').forEach(s=>s.classList.remove('active'));
   document.getElementById('scr-viewprofile').classList.add('active');
@@ -1158,13 +1160,13 @@ async function toggleFollow(uid,btn){
     await ref.delete();
     await db.collection('users').doc(uid).update({followers:firebase.firestore.FieldValue.increment(-1)});
     await db.collection('users').doc(CU.uid).update({following:firebase.firestore.FieldValue.increment(-1)});
-    if(btn){btn.textContent='Follow';btn.classList.remove('flw');}
+    if(btn){btn.textContent='Support';btn.classList.remove('flw');}
   } else {
     await ref.set({followerId:CU.uid,followingId:uid,createdAt:ts()});
     await db.collection('users').doc(uid).update({followers:firebase.firestore.FieldValue.increment(1)});
     await db.collection('users').doc(CU.uid).update({following:firebase.firestore.FieldValue.increment(1)});
-    if(btn){btn.textContent='Following';btn.classList.add('flw');}
-    addNotif(uid,'join',`${CUD.username} followed you.`,'','');
+    if(btn){btn.textContent='Supporting';btn.classList.add('flw');}
+    addNotif(uid,'join',`${CUD.username} Supported you.`,'','');
   }
 }
 
@@ -1282,6 +1284,7 @@ body.appendChild(item);
 
 async function showResults(chalId) {
   // Navigate to results screen
+  history.pushState({screen:'results'}, '', '');
   prevScr = curScr; curScr = 'results';
   document.querySelectorAll('.scr').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.bn').forEach(b => b.classList.remove('active'));
@@ -1330,7 +1333,7 @@ async function showResults(chalId) {
     }
 
     const winnerSlot = `
-      <div class="podium-slot first">
+      <div class="podium-slot first" onclick="viewProfile('${winner.authorId}')">
         <div class="podium-av-wrap">
           <div class="podium-crown">👑</div>
           ${podiumAv(winner, 'first')}
@@ -1343,8 +1346,8 @@ async function showResults(chalId) {
       </div>`;
 
     const secondSlot = second ? `
-      <div class="podium-slot second">
-        <div class="podium-av-wrap">${podiumAv(second, 'second')}</div>
+      <div class="podium-slot second" onclick="viewProfile('${second.authorId}')">
+        <div class="podium-av-wrap" >${podiumAv(second, 'second')}</div>
         <div class="podium-name">${esc(second.authorName || '')}</div>
         <div class="podium-un">${esc(second.authorUsername || '')}</div>
         <div class="podium-votes">${fmtN(second.votes || 0)} votes</div>
@@ -1353,8 +1356,8 @@ async function showResults(chalId) {
       </div>` : '';
 
     const thirdSlot = third ? `
-      <div class="podium-slot third">
-        <div class="podium-av-wrap">${podiumAv(third, 'third')}</div>
+      <div class="podium-slot third" onclick="viewProfile('${third.authorId}')">
+        <div class="podium-av-wrap" >${podiumAv(third, 'third')}</div>
         <div class="podium-name">${esc(third.authorName || '')}</div>
         <div class="podium-un">${esc(third.authorUsername || '')}</div>
         <div class="podium-votes">${fmtN(third.votes || 0)} votes</div>

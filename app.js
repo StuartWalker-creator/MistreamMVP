@@ -393,7 +393,7 @@ function buildArenaCard(chalId,d){
     :`<div class="ac-cr-av">${(d.creatorName||'?').charAt(0).toUpperCase()}</div>`;
 
   const badgeHTML=isEnded
-    ?`<div class="ac-ended-badge"><span class="ac-ended-txt">ENDED</span></div>`
+    ?``
     :`<div class="ac-badge"><div class="ac-badge-dot"></div><span class="ac-badge-txt">LIVE</span></div>`;
 
   div.innerHTML=`
@@ -419,6 +419,9 @@ function buildArenaCard(chalId,d){
          <div class="vba-btn" onclick="openComments('challenges','${chalId}')">
             <i class="fa-regular fa-comment-dots"></i>
             <span id="com-cnt-${chalId}">${fmtN(d.commentCount||0)}</span>
+          </div>
+          <div class="vba-btn" onclick="showResults('${chalId}')">
+            <i class="fa-regular fa-chart-bar"></i>
           </div>
         ${badgeHTML}
       </div>

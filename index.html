@@ -163,6 +163,15 @@
       <div id="viewprofile-body"></div>
     </div>
 
+<!-- RESULTS SCREEN -->
+<div class="scr" id="scr-results">
+  <div class="pg-hdr light back-hdr">
+    <button class="bk-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button>
+    <h2 id="results-title">Challenge Results</h2>
+  </div>
+  <div id="results-body"></div>
+</div>
+
     <!-- ══ NOTIFICATIONS ══ -->
     <div class="scr" id="scr-notifications">
       <div class="pg-hdr light">
@@ -254,6 +263,31 @@
 
   <!-- TOAST -->
   <div class="toast hidden" id="toast"></div>
+  
+  <!-- FEEDBACK MODAL -->
+<div class="cs-overlay hidden" id="feedback-overlay">
+  <div class="cs-backdrop" onclick="closeFeedback()"></div>
+  <div class="cs-panel" style="height:auto;max-height:75%;border-radius:20px 20px 0 0;">
+    <div class="cs-drag"></div>
+    <div class="cs-hdr">
+      <h3><i class="fa-regular fa-comment-dots"></i> Share Feedback</h3>
+      <button onclick="closeFeedback()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div style="padding:16px 20px 32px;">
+      <p style="font-size:13px;color:var(--mu);line-height:1.7;margin-bottom:16px;">Help us improve MiStream. Share anything — what you love, what's broken, what you wish existed. We read every single one.</p>
+      <textarea id="feedback-text" placeholder="Your feedback or suggestion..." rows="5" maxlength="500"
+        style="width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:12px;font-size:14px;font-family:'Syne',sans-serif;color:var(--tx);resize:none;outline:none;"
+        oninput="document.getElementById('feedback-send').disabled=!this.value.trim()"></textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;margin-bottom:14px;">
+        <span style="font-family:'Space Mono',monospace;font-size:9px;color:var(--mu2);" id="feedback-char">0/500</span>
+      </div>
+      <div class="errmsg hidden" id="feedback-err"></div>
+      <button class="btn-or w" id="feedback-send" disabled onclick="submitFeedback()">
+        <i class="fa-solid fa-paper-plane"></i> <span>Send Feedback</span>
+      </button>
+    </div>
+  </div>
+</div>
 
 </div>
 

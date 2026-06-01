@@ -202,6 +202,7 @@ function friendlyErr(code){
 // NAVIGATION
 // ═══════════════════════════════════ 
 function showScr(name){
+  history.pushState({screen:name},'','');
   prevScr=curScr; curScr=name;
   document.querySelectorAll('.scr').forEach(s=>s.classList.remove('active')); 
   document.querySelectorAll('.bn').forEach(b=>b.classList.remove('active'));
@@ -389,6 +390,10 @@ function buildArenaCard(chalId,d){
         <div class="ac-meta-chip timer"><i class="fa-regular fa-clock"></i>${isEnded?'Ended':timeLeft(d.expiresAt?.toDate())}</div>
         <div class="ac-meta-chip"><i class="fa-solid fa-users"></i>${fmtN(tot)} entries</div>
         <div class="ac-meta-chip"><i class="fa-regular fa-thumbs-up"></i>${fmtN(votes)} votes</div>
+         <div class="vba-btn" onclick="openComments('challenges','${chalId}')">
+            <i class="fa-regular fa-comment-dots"></i>
+            <span id="com-cnt-${chalId}">${fmtN(d.commentCount||0)}</span>
+          </div>
         ${badgeHTML}
       </div>
     </div>
@@ -404,10 +409,11 @@ function buildArenaCard(chalId,d){
       <div class="vb-progress" id="vbp-${chalId}"></div>
       <div class="vb-actions">
         <div class="vba-left">
-          <div class="vba-btn" id="join-btn-${chalId}" onclick="openJoin('${chalId}','${esc(d.title||'')}','${esc(d.creatorUsername||'')}','${d.creatorId||''}')">
+        ${!isEnded?` <div class="vba-btn" id="join-btn-${chalId}" onclick="openJoin('${chalId}','${esc(d.title||'')}','${esc(d.creatorUsername||'')}','${d.creatorId||''}')">
             <i class="fa-solid fa-shield-halved"></i>
             <span>Submit Entry</span>
-          </div>
+          </div>`:''}
+         
           <div class="vba-btn" onclick="openComments('challenges','${chalId}')">
             <i class="fa-regular fa-comment-dots"></i>
             <span id="com-cnt-${chalId}">${fmtN(d.commentCount||0)}</span>
@@ -1053,8 +1059,21 @@ async function initProfile(uid,isOwn,container){
         <div class="ps"><div class="ps-v go">${fmtN(u.challengesJoined||0)}</div><div class="ps-l">Entered</div></div>
       </div>
       ${isOwn
-        ?`<div class="prof-acts"><button class="prof-edit-btn" onclick="showToast('Edit profile coming soon!')">Edit Profile</button></div>
-           <div class="prof-acts" style="margin-top:-8px;"><button class="btn-ghost w" onclick="auth.signOut()"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button></div>`
+        ?`<div class="profile-actions"><div class="prof-acts"><button class="prof-edit-btn" onclick="showToast('Edit profile coming soon!')">Edit Profile</button></div>
+           <div class="prof-acts" style="margin-top:-8px;"><button class="btn-ghost w" onclick="auth.signOut()"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button></div> </div>
+           <div style="padding:0 8px 8px;">
+  <button onclick="openFeedback()"
+    style="width:100%;background:rgba(245,180,50,0.06);border:1px solid rgba(245,180,50,0.2);border-radius:8px;padding:14px;display:flex;align-items:center;gap:10px;cursor:pointer;">
+    <div style="width:36px;height:36px;border-radius:50%;background:rgba(245,180,50,0.1);border:1px solid rgba(245,180,50,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <i class="fa-regular fa-comment-dots" style="font-size:15px;color:var(--go);"></i>
+    </div>
+    <div style="text-align:left;">
+      <div style="font-size:13px;font-weight:700;color:var(--tx);">Give Feedback</div>
+      <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--mu);margin-top:2px;">Help us build MiStream better</div>
+    </div>
+    <i class="fa-solid fa-chevron-right" style="font-size:12px;color:var(--mu2);margin-left:auto;"></i>
+  </button>
+</div>`
         :`<div class="prof-acts"><button class="prof-follow-btn" id="pfb-${uid}" onclick="toggleFollow('${uid}',this)">Follow</button></div>`
       }
       ${!isOwn?`<div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--mu);margin-bottom:14px;">${fmtN(u.profileViews||0)} profile views</div>`:''}
@@ -1255,13 +1274,164 @@ async function initNotifs(){
     const item=document.createElement('div');
     item.className=`ni${d.read?'':' unread'}`;
     item.innerHTML=`<div class="ni-ico ${type}"><i class="${iconMap[type]||'fa-solid fa-bell'}"></i></div><div class="ni-txt"><p>${esc(d.message||'')}</p></div><div class="ni-time">${d.createdAt?timeAgo(d.createdAt.toDate()):'now'}</div>`;
-    if(d.refId) item.onclick=()=>scrollToChallenge(d.refId);
-    body.appendChild(item);
+if(d.refId) item.onclick=()=>showResults(d.refId); 
+body.appendChild(item);
     if(!d.read) batch.update(doc.ref,{read:true});
   });
   await batch.commit();
   document.getElementById('notif-dot').classList.add('hidden');
 }
+
+async function showResults(chalId) {
+  // Navigate to results screen
+  prevScr = curScr; curScr = 'results';
+  document.querySelectorAll('.scr').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.bn').forEach(b => b.classList.remove('active'));
+  document.getElementById('scr-results').classList.add('active');
+  const body = document.getElementById('results-body');
+  body.innerHTML = '<div class="loading"><div class="spin dark"></div><span>Loading results...</span></div>';
+
+  // Fetch challenge
+  const chalSnap = await db.collection('challenges').doc(chalId).get();
+  if (!chalSnap.exists) { body.innerHTML = '<div class="loading"><p>Challenge not found.</p></div>'; return; }
+  const d = chalSnap.data();
+  const isEnded = d.status === 'ended' || (d.expiresAt && d.expiresAt.toDate() < new Date());
+
+  // Fetch all entries sorted by votes
+  const entriesSnap = await db.collection('entries')
+    .where('chalId', '==', chalId)
+    .limit(30)
+    .get();
+  const entries = entriesSnap.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .sort((a, b) => (b.votes || 0) - (a.votes || 0));
+
+  const top3 = entries.slice(0, 3);
+  const rest = entries.slice(3);
+
+  // Build hero section
+  const heroClass = isEnded ? 'ended' : 'active';
+  let heroHTML = '';
+
+  if (isEnded && top3.length > 0) {
+    // JUBILANT winner design
+    const winner = top3[0];
+    const second = top3[1];
+    const third = top3[2];
+
+    function podiumAv(entry, size) {
+      const init = (entry.authorName || '?').charAt(0).toUpperCase();
+      const bg = size === 'first'
+        ? 'linear-gradient(135deg,var(--go),#e09020)'
+        : size === 'second'
+          ? 'linear-gradient(135deg,#a0a0c0,#808090)'
+          : 'linear-gradient(135deg,#c07040,#a05030)';
+      return entry.authorPhoto
+        ? `<div class="podium-av" style="background:none;"><img src="${entry.authorPhoto}"/></div>`
+        : `<div class="podium-av" style="background:${bg};">${init}</div>`;
+    }
+
+    const winnerSlot = `
+      <div class="podium-slot first">
+        <div class="podium-av-wrap">
+          <div class="podium-crown">👑</div>
+          ${podiumAv(winner, 'first')}
+        </div>
+        <div class="podium-name">${esc(winner.authorName || '')}</div>
+        <div class="podium-un">${esc(winner.authorUsername || '')}</div>
+        <div class="podium-votes">${fmtN(winner.votes || 0)} votes</div>
+        <div class="podium-rank rk-1">🥇</div>
+        <div class="podium-base"></div>
+      </div>`;
+
+    const secondSlot = second ? `
+      <div class="podium-slot second">
+        <div class="podium-av-wrap">${podiumAv(second, 'second')}</div>
+        <div class="podium-name">${esc(second.authorName || '')}</div>
+        <div class="podium-un">${esc(second.authorUsername || '')}</div>
+        <div class="podium-votes">${fmtN(second.votes || 0)} votes</div>
+        <div class="podium-rank rk-2">🥈</div>
+        <div class="podium-base"></div>
+      </div>` : '';
+
+    const thirdSlot = third ? `
+      <div class="podium-slot third">
+        <div class="podium-av-wrap">${podiumAv(third, 'third')}</div>
+        <div class="podium-name">${esc(third.authorName || '')}</div>
+        <div class="podium-un">${esc(third.authorUsername || '')}</div>
+        <div class="podium-votes">${fmtN(third.votes || 0)} votes</div>
+        <div class="podium-rank rk-3">🥉</div>
+        <div class="podium-base"></div>
+      </div>` : '';
+
+    heroHTML = `
+      <div class="results-hero ${heroClass}">
+        <div class="results-hero-glow"></div>
+        <div class="winner-label">🏆 WINNER</div>
+        <div class="winner-chal-name">${esc(d.title || '')}</div>
+        <div class="podium">${secondSlot}${winnerSlot}${thirdSlot}</div>
+        <div class="results-meta">
+          <div class="results-meta-chip go"><i class="fa-regular fa-thumbs-up"></i>${fmtN(d.totalVotes || 0)} total votes</div>
+          <div class="results-meta-chip"><i class="fa-solid fa-users"></i>${fmtN(d.entryCount || 0)} entries</div>
+          <div class="results-meta-chip"><i class="fa-solid fa-flag"></i>by ${esc(d.creatorUsername || '')}</div>
+        </div>
+      </div>`;
+  } else {
+    // ACTIVE challenge — clean meta only, no winner design
+    heroHTML = `
+      <div class="results-hero ${heroClass}" style="background:var(--bg);border-bottom:1px solid var(--bd);">
+        <div style="text-align:left;">
+          <div class="results-chal-name" style="color:var(--tx);">${esc(d.title || '')}</div>
+          ${d.description ? `<div class="results-chal-desc" style="color:var(--mu);">${esc(d.description)}</div>` : ''}
+          <div class="results-meta" style="justify-content:flex-start;">
+            <div class="results-meta-chip" style="color:var(--mu);"><i class="fa-regular fa-clock" style="color:var(--or);"></i>${d.expiresAt ? timeLeft(d.expiresAt.toDate()) : 'No deadline'}</div>
+            <div class="results-meta-chip" style="color:var(--mu);"><i class="fa-regular fa-thumbs-up" style="color:var(--or);"></i>${fmtN(d.totalVotes || 0)} votes</div>
+            <div class="results-meta-chip" style="color:var(--mu);"><i class="fa-solid fa-users" style="color:var(--or);"></i>${fmtN(d.entryCount || 0)} entries</div>
+          </div>
+          <div class="results-active-note">
+            <i class="fa-solid fa-shield-halved"></i>
+            <p>Challenge still running. Rankings update live as votes come in.</p>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // Build table for all entries
+  const medals = ['🥇', '🥈', '🥉'];
+  const rankClasses = ['top1', 'top2', 'top3'];
+  let tableRows = '';
+  entries.forEach((e, i) => {
+    const rankLabel = i < 3 ? medals[i] : (i + 1).toString();
+    const rankClass = i < 3 ? rankClasses[i] : '';
+    const rankColor = i === 0 ? 'rk-1' : i === 1 ? 'rk-2' : i === 2 ? 'rk-3' : 'rk-n';
+    const avHTML = e.authorPhoto
+      ? `<div class="rt-av"><img src="${e.authorPhoto}"/></div>`
+      : `<div class="rt-av">${(e.authorName || '?').charAt(0).toUpperCase()}</div>`;
+    tableRows += `
+      <div class="rt-row ${rankClass}" onclick="viewProfile('${e.authorId}')">
+        <div class="rt-rank ${rankColor}">${rankLabel}</div>
+        ${avHTML}
+        <div class="rt-info">
+          <div class="rt-name">${esc(e.authorName || '')}</div>
+          <div class="rt-un">${esc(e.authorUsername || '')}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div class="rt-votes">${fmtN(e.votes || 0)}</div>
+          <div class="rt-votes-lbl">VOTES</div>
+        </div>
+      </div>`;
+  });
+
+  const tableSection = entries.length > 0 ? `
+    <div class="results-table">
+      <div class="results-table-hdr">${isEnded ? 'FINAL RANKINGS' : 'CURRENT STANDINGS'} · ${entries.length} ENTRIES</div>
+      ${tableRows}
+    </div>` : `<div class="loading" style="padding:40px;color:var(--mu);"><p>No entries yet.</p></div>`;
+
+  body.innerHTML = heroHTML + tableSection;
+  document.getElementById('results-title').textContent = isEnded ? 'Challenge Results' : 'Live Standings';
+}
+
 async function addNotif(toUid,type,message,refCollection,refId){
   if(!toUid||toUid===CU.uid)return;
   await db.collection('notifications').add({toUid,type,message,refCollection,refId,read:false,createdAt:ts()});
@@ -1332,6 +1502,23 @@ function fmtN(n){n=parseInt(n)||0;if(n>=1000000)return(n/1000000).toFixed(1)+'M'
 function timeAgo(d){const s=Math.floor((Date.now()-d)/1000);if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m';if(s<86400)return Math.floor(s/3600)+'h';if(s<604800)return Math.floor(s/86400)+'d';return d.toLocaleDateString();}
 function timeLeft(d){if(!d)return'';const s=Math.max(0,Math.floor((d-Date.now())/1000));if(s<60)return s+'s left';if(s<3600)return Math.floor(s/60)+'m left';if(s<86400)return Math.floor(s/3600)+'h left';return Math.floor(s/86400)+'d left';}
 function showToast(msg){const old=document.getElementById('toast');if(old)old.remove();const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3200);}
+window.addEventListener('popstate', (e) => {
+  const target = e.state?.screen || prevScr || 'arena';
+  // Directly activate the screen without pushing more history
+  prevScr = curScr;
+  curScr = target;
+  document.querySelectorAll('.scr').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.bn').forEach(b => b.classList.remove('active'));
+  const scr = document.getElementById(`scr-${target}`);
+  if (scr) scr.classList.add('active');
+  const bn = document.getElementById(`bn-${target}`);
+  if (bn) bn.classList.add('active');
+  // Run screen init if needed
+  if (target === 'arena') initArena();
+  if (target === 'profile') initProfile(CU?.uid, true);
+  if (target === 'notifications') initNotifs();
+});
+
 function setBtnLoad(btn, loading, reset) {
   if (!btn) return;
   if (loading) {
@@ -1339,6 +1526,47 @@ function setBtnLoad(btn, loading, reset) {
     btn.disabled = true;
   } else {
     if (reset) btn.innerHTML = reset;
+    btn.disabled = false;
+  }
+}
+
+function openFeedback() {
+  document.getElementById('feedback-overlay').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  document.getElementById('feedback-text').value = '';
+  document.getElementById('feedback-send').disabled = true;
+  document.getElementById('feedback-err')?.classList.add('hidden');
+  // Character counter
+  document.getElementById('feedback-text').oninput = function() {
+    document.getElementById('feedback-char').textContent = this.value.length + '/500';
+    document.getElementById('feedback-send').disabled = !this.value.trim();
+  };
+}
+
+function closeFeedback() {
+  document.getElementById('feedback-overlay').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+async function submitFeedback() {
+  const text = document.getElementById('feedback-text').value.trim();
+  if (!text) return;
+  const btn = document.getElementById('feedback-send');
+  btn.innerHTML = '<div class="spin" style="width:16px;height:16px;border-color:rgba(255,255,255,.3);border-top-color:#fff;margin:0 auto;"></div>';
+  btn.disabled = true;
+  try {
+    await db.collection('feedback').add({
+      text,
+      username: CUD?.username || null,
+      uid: CU?.uid || null,
+      createdAt: ts()
+    });
+    closeFeedback();
+    showToast('🙏 Thank you! We read every single one.');
+  } catch(e) {
+    document.getElementById('feedback-err').textContent = 'Failed to send. Check your connection.';
+    document.getElementById('feedback-err').classList.remove('hidden');
+    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> <span>Send Feedback</span>';
     btn.disabled = false;
   }
 }

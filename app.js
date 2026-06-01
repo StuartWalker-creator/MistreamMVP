@@ -382,10 +382,16 @@ function buildArenaCard(chalId,d){
         <div class="ac-title">${esc(d.title||'Untitled')}</div>
       </div>
       ${d.description?`<div class="ac-desc">${esc(d.description)}</div>`:''}
+      <div class="ac-top-actions">
       <div class="ac-creator" onclick="viewProfile('${d.creatorId}')">
         ${crAvHTML}
         <div class="ac-cr-name">by <span>${esc(d.creatorUsername||'')}</span></div>
       </div>
+       ${!isEnded?` <div class="vba-btn join-chal" id="join-btn-${chalId}" onclick="openJoin('${chalId}','${esc(d.title||'')}','${esc(d.creatorUsername||'')}','${d.creatorId||''}')">
+            <i class="fa-solid fa-shield-halved"></i>
+            <span>Join Challenge</span>
+          </div>`:''} </div>
+          
       <div class="ac-meta">
         <div class="ac-meta-chip timer"><i class="fa-regular fa-clock"></i>${isEnded?'Ended':timeLeft(d.expiresAt?.toDate())}</div>
         <div class="ac-meta-chip"><i class="fa-solid fa-users"></i>${fmtN(tot)} entries</div>
@@ -402,22 +408,14 @@ function buildArenaCard(chalId,d){
     </div>
     <div class="vote-bar" id="vb-${chalId}">
       <div class="vb-swipe-hint" id="vsh-${chalId}">← swipe to compare more entries →</div>
-      <div class="vb-row">
-        <button class="vbtn vbtn-a" id="va-${chalId}" onclick="castVote('${chalId}','a',this)">Vote Left</button>
+      ${!isEnded?`<div class="vb-row">
+       <button class="vbtn vbtn-a" id="va-${chalId}" onclick="castVote('${chalId}','a',this)">Vote Left</button>
         <button class="vbtn vbtn-b" id="vb2-${chalId}" onclick="castVote('${chalId}','b',this)">Vote Right</button>
-      </div>
+      </div>`:`<button class="results-btn" onclick="showResults('${chalId}')">View Results</button>`}
       <div class="vb-progress" id="vbp-${chalId}"></div>
       <div class="vb-actions">
         <div class="vba-left">
-        ${!isEnded?` <div class="vba-btn" id="join-btn-${chalId}" onclick="openJoin('${chalId}','${esc(d.title||'')}','${esc(d.creatorUsername||'')}','${d.creatorId||''}')">
-            <i class="fa-solid fa-shield-halved"></i>
-            <span>Submit Entry</span>
-          </div>`:''}
-         
-          <div class="vba-btn" onclick="openComments('challenges','${chalId}')">
-            <i class="fa-regular fa-comment-dots"></i>
-            <span id="com-cnt-${chalId}">${fmtN(d.commentCount||0)}</span>
-          </div>
+       
         </div>
         <div class="pair-indicator" id="pi-${chalId}"></div>
       </div>

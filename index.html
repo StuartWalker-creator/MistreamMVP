@@ -100,17 +100,17 @@
           <div class="ci-icon"><i class="fa-solid fa-shield-halved"></i></div>
           <div>
             <div class="ci-title">Create a Challenge</div>
-            <div class="ci-sub">Make a claim. Others will come to prove you wrong.</div>
+            <div class="ci-sub">Make a topic.Other Creators will submit their versions and compete for votes..</div>
           </div>
         </div>
         <div class="my-id" id="my-id"></div>
-        <div class="fg light"><label>Challenge Title <span class="req">*</span></label>
-          <input type="text" id="chal-title" placeholder='e.g. "Nobody in Uganda is funnier than me"' maxlength="80" class="input-light"/>
+        <div class="fg light"><label>Challenge Topic <span class="req">*</span></label>
+          <input type="text" id="chal-title" placeholder='e.g. "The worst excuse for being late"' maxlength="80" class="input-light"/>
           <div class="title-chips" id="title-chips">
-            <div class="chip" onclick="useChip(this)">Nobody can beat me at...</div>
+            <!--<div class="chip" onclick="useChip(this)">Nobody can beat me at...</div>
             <div class="chip" onclick="useChip(this)">Who is funnier than...</div>
             <div class="chip" onclick="useChip(this)">I challenge anyone to...</div>
-            <div class="chip" onclick="useChip(this)">Prove you're better at...</div>
+            <div class="chip" onclick="useChip(this)">Prove you're better at...</div>-->
           </div>
         </div>
         <div class="fg light"><label>Description <span style="opacity:.5;font-weight:400;">(optional)</span></label>
@@ -121,12 +121,12 @@
           <p class="field-hint">You must submit the first entry to start the challenge.</p>
           <div class="mdrop" id="entry-drop" onclick="document.getElementById('entry-media').click()">
             <i class="fa-solid fa-photo-film"></i>
-            <span>Add your entry video or photo</span>
+            <span>Add your entry video(15 seconds to 3minutes long) or photo</span>
             <input type="file" id="entry-media" accept="image/*,video/*" hidden onchange="prevEntryMedia(this)"/>
           </div>
           <div id="entry-media-prev" class="hidden"></div>
           <div class="fg light" style="margin-top:10px;margin-bottom:0;">
-            <input type="text" id="entry-cap" placeholder="Entry caption — your claim in one line" maxlength="120" class="input-light"/>
+            <input type="text" id="entry-cap" placeholder="Entry optional caption — your claim in one line" maxlength="120" class="input-light"/>
           </div>
         </div>
         <div class="fg light">
@@ -142,7 +142,7 @@
         </div>
         <div class="public-note">
           <i class="fa-solid fa-globe"></i>
-          <p>This challenge is <strong>public</strong> — anyone in @comedy can join by submitting their entry.</p>
+          <p>This challenge is <strong>public</strong> — anyone in @comedy can vote or join by submitting their entry.</p>
         </div>
         <div class="errmsg hidden" id="create-err"></div>
         <button class="btn-or w" onclick="submitChallenge()"><i class="fa-solid fa-flag"></i> <span>Launch Challenge</span></button>

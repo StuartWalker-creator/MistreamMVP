@@ -590,6 +590,9 @@ mediaHTML = `
           <i class="fa-regular fa-comment-dots"></i>
           <span>${fmtN(entry.commentCount||0)}</span>
         </div>
+        <div class="bs-act">
+          <button class="bs-support-btn" onclick="toggleFollow('${entry.authorId}',this)">Support</button>
+        </div>
       </div>
     </div>`;
 

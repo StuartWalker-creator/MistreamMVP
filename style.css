@@ -61,7 +61,7 @@ html,body{height:100%;overflow:hidden;font-family:'Syne',sans-serif;background:v
 
 /* FORM */
 .fg{margin-bottom:14px;}
-.fg label{display:block;font-size:10px;font-weight:700;color:rgba(255,255,255,.45);margin-bottom:5px;letter-spacing:.5px;text-transform:uppercase;}
+.fg label{display:block;font-size:10px;font-weight:700;color:#8F5C1296;margin-bottom:5px;letter-spacing:.5px;text-transform:uppercase;}
 .fg input,.fg textarea{width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:11px 13px;color:#fff;font-size:14px;font-family:'Syne',sans-serif;outline:none;transition:border-color .2s;}
 .fg input:focus,.fg textarea:focus{border-color:var(--or);}
 .fg input::placeholder,.fg textarea::placeholder{color:rgba(255,255,255,.2);}
@@ -178,6 +178,16 @@ html,body{height:100%;overflow:hidden;font-family:'Syne',sans-serif;background:v
 .bs-act i{font-size:15px;color:rgba(255,255,255,.6);}
 .bs-act span{font-family:'Space Mono',monospace;font-size:9px;color:rgba(255,255,255,.6);}
 .bs-act.liked i{color:var(--re);}
+.bs-support-btn{
+  border: 1.3px solid #D38F0E;
+  padding:3px 6px;
+  border-radius: 20px;
+  color: #D9BE8C;
+  background: transparent;
+  font-weight: 500;
+  font-size: 11px;
+ margin-bottom: 3px;
+}
 .vs-divider{position:absolute;top:0;bottom:0;left:50%;transform:translateX(-50%);width:32px;display:flex;align-items:center;justify-content:center;z-index:10;pointer-events:none;}
 .vs-pill{background:rgba(6,6,8,.8);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:4px 7px;font-family:'Bebas Neue',sans-serif;font-size:14px;color:rgba(255,255,255,.5);backdrop-filter:blur(8px);}
 

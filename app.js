@@ -591,7 +591,7 @@ mediaHTML = `
           <span>${fmtN(entry.commentCount||0)}</span>
         </div>
         <div class="bs-act">
-          <button class="bs-support-btn" onclick="toggleFollow('${entry.authorId}',this)">Support</button>
+          <button class="bs-support-btn" id="support-${entry.id}" onclick="toggleFollow('${entry.authorId}',this)">Support</button>
         </div>
       </div>
     </div>`;
@@ -610,6 +610,11 @@ mediaHTML = `
       document.getElementById(`like-act-${sideId}`)?.classList.add('liked');
     }
   });
+  
+  db.collection('follows').doc(`${CU.uid}_${entry.authorId}`).get().then(s=>{
+      const btn=document.getElementById(`support-${entry.id}`);
+      if(s.exists&&btn){btn.textContent='Supporting';btn.classList.add('flw');}
+    });
 
   return div;
 }
@@ -1181,17 +1186,24 @@ async function viewProfile(uid){
 async function toggleFollow(uid,btn){
   const fid=`${CU.uid}_${uid}`;
   const ref=db.collection('follows').doc(fid);
+  if (btn.textContent=='Support') {
+    btn.textContent='Supporting'
+    btn.classList.add('flw');
+  } else {
+        btn.textContent='Support'
+        btn.classList.remove('flw');
+  }
   const snap=await ref.get();
   if(snap.exists){
     await ref.delete();
     await db.collection('users').doc(uid).update({followers:firebase.firestore.FieldValue.increment(-1)});
     await db.collection('users').doc(CU.uid).update({following:firebase.firestore.FieldValue.increment(-1)});
-    if(btn){btn.textContent='Support';btn.classList.remove('flw');}
+   /* if(btn){btn.textContent='Support';btn.classList.remove('flw');}*/
   } else {
     await ref.set({followerId:CU.uid,followingId:uid,createdAt:ts()});
     await db.collection('users').doc(uid).update({followers:firebase.firestore.FieldValue.increment(1)});
     await db.collection('users').doc(CU.uid).update({following:firebase.firestore.FieldValue.increment(1)});
-    if(btn){btn.textContent='Supporting';btn.classList.add('flw');}
+   /* if(btn){btn.textContent='Supporting';btn.classList.add('flw');}*/
     addNotif(uid,'join',`${CUD.username} Supported you.`,'','');
   }
 }

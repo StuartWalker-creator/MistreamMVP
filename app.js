@@ -948,7 +948,8 @@ async function submitChallenge(){
     resetCreateForm();
     showToast('🏆 Challenge launched!');
     showScr('arena');
-  }catch(e){showErr(err,e.message);}
+  }catch(e){hideUploadProgress()
+  showErr(err,e.message);}
   setBtnLoad(btn,false,'<i class="fa-solid fa-flag"></i> <span>Launch Challenge</span>');
 }
 

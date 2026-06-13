@@ -12,6 +12,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.firestore();
+const messaging = firebase.messaging();
 
 const CLD_CLOUD  = 'dvdshonhc';
 const CLD_PRESET = 'mistream_uploads';
@@ -61,12 +62,39 @@ window.addEventListener('load',()=>{
           if(snap.exists) break;
           await new Promise(r=>setTimeout(r,800));
         }
-        if(snap && snap.exists){ CU=user; CUD=snap.data(); initApp(); }
+        if(snap && snap.exists){ CU=user;
+        await registerFCM()
+        CUD=snap.data(); initApp(); }
         else{ showAuth(); sv('v-register'); }
       } else { showAuth(); sv('v-login'); }
     });
   },2400);
 });
+
+async function registerFCM(){
+  try{
+    const permission = await Notification.requestPermission();
+
+    if(permission !== 'granted') return;
+
+    const token = await messaging.getToken({
+      vapidKey:'BNpuj8ZHYAotQqbEQ_hiQ3Uo6c47bz21TLUwHYw4gDjaAO-Eir438RDKaLe_fqqilPGGgJVB7jwhfVRF-Vy8fEw'
+    });
+
+    if(!token) return;
+
+    await db.collection('users')
+      .doc(CU.uid)
+      .update({
+        fcmToken: token
+      });
+
+    console.log('FCM token saved');
+  }
+  catch(err){
+    console.error(err);
+  }
+}
 
 function showAuth(){
   document.getElementById('auth').classList.remove('hidden');
@@ -1301,13 +1329,53 @@ async function likeComment(commentId,btn){
 // ═══════════════════════════════════
 // NOTIFICATIONS
 // ═══════════════════════════════════
-function listenNotifs(){
-  if(notifUnsub) notifUnsub();
-  notifUnsub=db.collection('notifications').where('toUid','==',CU.uid).where('read','==',false)
-    .onSnapshot(snap=>{
-      document.getElementById('notif-dot').classList.toggle('hidden',snap.size===0);
+let notifListenerReady = false;
+
+function listenNotifs() {
+  
+  if (notifUnsub) notifUnsub();
+  
+  notifUnsub = db.collection('notifications')
+    .where('toUid', '==', CU.uid)
+    .where('read', '==', false)
+    .onSnapshot(snap => {
+      
+      document.getElementById('notif-dot')
+        .classList.toggle('hidden', snap.size === 0);
+      
+      if (!notifListenerReady) {
+        notifListenerReady = true;
+        return;
+      }
+      
+      snap.docChanges().forEach(change => {
+        
+        if (change.type !== 'added') return;
+        
+        const d = change.doc.data();
+        
+        if (Notification.permission === 'granted') {
+          
+          const n = new Notification('MiStream', {
+            body: d.message || 'New notification',
+            icon: '/icon-192.png'
+          });
+          
+          n.onclick = () => {
+            window.focus();
+            
+            if (d.refId) {
+              showResults(d.refId);
+            }
+          };
+        }
+        
+      });
+      
     });
+  
 }
+
 async function initNotifs(){
   const body=document.getElementById('notif-body');
   body.innerHTML='<div class="loading"><div class="spin dark"></div></div>';

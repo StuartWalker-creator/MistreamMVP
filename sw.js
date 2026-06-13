@@ -1,27 +1,6 @@
 // MiStream Service Worker
 // NO caching of app files — always fetch fresh from network
 // Only handles push notifications
-importScripts(
-'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js'
-);
-
-importScripts(
-'https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js'
-);
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCHBo_6-GZi4M7p77-Tk8W32i24KuD-tqg",
-  authDomain: "bodaboda-9a325.firebaseapp.com",
-  projectId: "bodaboda-9a325",
-  storageBucket: "bodaboda-9a325.firebasestorage.app",
-  messagingSenderId: "860902193551",
-  appId: "1:860902193571:web:e70a25b2c967e3c7570216"
-};
-
-firebase.initializeApp(firebaseConfig);
-
-
-const messaging = firebase.messaging();
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', () => clients.claim());
@@ -52,14 +31,3 @@ self.addEventListener('notificationclick', e => {
   );
 });
 
-messaging.onBackgroundMessage(payload => {
-
-  self.registration.showNotification(
-    payload.notification.title,
-    {
-      body: payload.notification.body,
-      icon:'/icon-192.png'
-    }
-  );
-
-});

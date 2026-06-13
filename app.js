@@ -1318,7 +1318,7 @@ function listenNotifs() {
       document.getElementById('notif-dot')
         .classList.toggle('hidden', snap.size === 0);
       
-      if (notifListenerReady) {
+      if (!notifListenerReady) {
         notifListenerReady = true;
         return;
       }
@@ -1331,18 +1331,15 @@ function listenNotifs() {
         
         if (Notification.permission === 'granted') {
           
-          const n = new Notification('MiStream', {
-            body: d.message || 'New notification',
-            icon: '/icon-192.png'
-          });
-          
-          n.onclick = () => {
-            window.focus();
-            
-            if (d.refId) {
-              showResults(d.refId);
-            }
-          };
+          navigator.serviceWorker.ready.then(reg => {
+
+    reg.showNotification('MiStream', {
+      body: d.message || 'New notification',
+      icon: '/icon-192.png',
+      tag: change.doc.id
+    });
+
+  });
         }
         
       });

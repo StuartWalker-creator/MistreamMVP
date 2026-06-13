@@ -63,7 +63,6 @@ window.addEventListener('load',()=>{
           await new Promise(r=>setTimeout(r,800));
         }
         if(snap && snap.exists){ CU=user;
-        await registerFCM()
         CUD=snap.data(); initApp(); }
         else{ showAuth(); sv('v-register'); }
       } else { showAuth(); sv('v-login'); }
@@ -71,30 +70,6 @@ window.addEventListener('load',()=>{
   },2400);
 });
 
-async function registerFCM(){
-  try{
-    const permission = await Notification.requestPermission();
-
-    if(permission !== 'granted') return;
-
-    const token = await messaging.getToken({
-      vapidKey:'BNpuj8ZHYAotQqbEQ_hiQ3Uo6c47bz21TLUwHYw4gDjaAO-Eir438RDKaLe_fqqilPGGgJVB7jwhfVRF-Vy8fEw'
-    });
-
-    if(!token) return;
-
-    await db.collection('users')
-      .doc(CU.uid)
-      .update({
-        fcmToken: token
-      });
-
-    console.log('FCM token saved');
-  }
-  catch(err){
-    console.error(err);
-  }
-}
 
 function showAuth(){
   document.getElementById('auth').classList.remove('hidden');
@@ -1343,7 +1318,7 @@ function listenNotifs() {
       document.getElementById('notif-dot')
         .classList.toggle('hidden', snap.size === 0);
       
-      if (!notifListenerReady) {
+      if (notifListenerReady) {
         notifListenerReady = true;
         return;
       }

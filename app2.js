@@ -935,7 +935,7 @@ async function notifyAllUsersNewChallenge(title, chalId){
       const nRef=db.collection('notifications').doc();
       batch.set(nRef,{
         toUid:doc.id, type:'new_challenge',
-        message:`📸 New challenge: "${title}" — submit your best photo now!`,
+        message:`📸 New challenge: "${title}" — submit your best entry now!`,
         refCollection:'challenges', refId:chalId, read:false, createdAt:ts()
       });
     });
@@ -1083,8 +1083,8 @@ async function initProfile(uid,isOwn,container){
       </div>
       <div class="prof-stats">
         <div class="ps"><div class="ps-v or">${fmtN(u.challengeWins||0)}</div><div class="ps-l">Wins</div></div>
-        <div class="ps"><div class="ps-v">${fmtN(u.followers||0)}</div><div class="ps-l">Supporters</div></div>
-        <div class="ps"><div class="ps-v go">${fmtN(u.totalVotesReceived||0)}</div><div class="ps-l">Votes</div></div>
+        <div class="ps"><div class="ps-v">${fmtN(u.challengesCreated||0)}</div><div class="ps-l">Created</div></div>
+        <div class="ps"><div class="ps-v go">${fmtN(u.challengesJoined||0)}</div><div class="ps-l">Entered</div></div>
       </div>
       ${isOwn
         ?`<div class="profile-actions"><div class="prof-acts"><button class="prof-edit-btn" onclick="showToast('Edit profile coming soon!')">Edit Profile</button></div>
@@ -1661,183 +1661,44 @@ async function submitFeedback() {
 // LEADERBOARD (real-time top 100)
 // ═══════════════════════════════════
 
-// ═══════════════════════════════════════════════════
-// LEADERBOARD — scoring, badges, real-time top 100
-// ═══════════════════════════════════════════════════
-
-// ── Timed win score ──────────────────────────────
-// Each win event ages: <7d=×5, 7–14d=×3, 14–30d=×2, >30d=×1
-// winEvents stored as array of Firestore Timestamps on user doc
-// Falls back gracefully if winEvents not present (uses raw win count ×1)
-function calcWinScore(u){
-  const now=Date.now();
-  const events=u.winEvents||[];
-  if(events.length===0){
-    // Legacy: no winEvents stored yet — count raw wins at ×1
-    return (u.challengeWins||0)*1;
-  }
-  let score=0;
-  events.forEach(ev=>{
-    const ts=ev&&ev.toDate?ev.toDate().getTime():(typeof ev==='number'?ev:0);
-    const ageDays=(now-ts)/(1000*60*60*24);
-    if(ageDays<7)        score+=5;
-    else if(ageDays<14)  score+=3;
-    else if(ageDays<30)  score+=2;
-    else                 score+=1;
-  });
-  return score;
-}
-
-// ── Main leaderboard score ────────────────────────
-// Win score (aged) + entries submitted + votes received
-function calcScore(u){
-  const winScore  = calcWinScore(u) * 10;
-  const entryScore= (u.challengesJoined||0) * 8;   // every submission counts
-  const voteScore = (u.totalVotesReceived||0) * 1;  // quality signal
-  return winScore + entryScore + voteScore;
-}
-
-// ── Badge definitions ─────────────────────────────
-// Each badge has: id, label, icon, cls, condition fn
-// Badges are computed per-user at render time — no separate Firestore writes needed
-const BADGE_DEFS = [
-  {
-    id:'master',
-    label:'Master',
-    icon:'👑',
-    cls:'badge-master-crown',
-    tip:'#1 ranked player',
-    // Assigned by initLeaderboard after sorting — not a condition fn
-  },
-  {
-    id:'demon_slayer',
-    label:'Demon Slayer',
-    icon:'🔥',
-    cls:'badge-demon',
-    tip:'Beat a player ranked 10+ positions above them',
-    cond:(u)=> (u.demonSlays||0)>=1,
-  },
-  {
-    id:'unbeaten',
-    label:'Unbeaten',
-    icon:'🛡️',
-    cls:'badge-unbeaten',
-    tip:'5+ wins, zero losses',
-    cond:(u)=> (u.challengeWins||0)>=5 && (u.challengeLosses||0)===0,
-  },
-  {
-    id:'hot_streak',
-    label:'Hot Streak',
-    icon:'⚡',
-    cls:'badge-streak',
-    tip:'3 wins in a row',
-    cond:(u)=> (u.currentStreak||0)>=3,
-  },
-  {
-    id:'crowd_fav',
-    label:'Crowd Fav',
-    icon:'💜',
-    cls:'badge-crowd',
-    tip:'Most votes received in last 30 days',
-    // Assigned by initLeaderboard — not a condition fn
-  },
-  {
-    id:'veteran',
-    label:'Veteran',
-    icon:'⚔️',
-    cls:'badge-veteran',
-    tip:'20+ challenge entries submitted',
-    cond:(u)=> (u.challengesJoined||0)>=20,
-  },
-  {
-    id:'relentless',
-    label:'Relentless',
-    icon:'🔄',
-    cls:'badge-relentless',
-    tip:'Entered 3+ challenges in one week',
-    cond:(u)=> (u.weeklyEntries||0)>=3,
-  },
-  {
-    id:'challenger',
-    label:'Challenger',
-    icon:'🎯',
-    cls:'badge-challenger',
-    tip:'Submitted first challenge entry',
-    cond:(u)=> (u.challengesJoined||0)>=1,
-  },
+const BADGES = [
+  { id:'rookie',   label:'Rookie',  min:0,    cls:'badge-rookie'  },
+  { id:'pro',      label:'Pro',     min:100,  cls:'badge-pro'     },
+  { id:'expert',   label:'Expert',  min:300,  cls:'badge-expert'  },
+  { id:'elite',    label:'Elite',   min:700,  cls:'badge-elite'   },
+  { id:'master',   label:'Master',  min:1500, cls:'badge-master'  },
+  { id:'ultra',    label:'Ultra',   min:3000, cls:'badge-ultra'   },
 ];
 
-function getUserBadges(u, rank, isCrowdFav){
-  const earned=[];
-  // Special positional badges
-  if(rank===1) earned.push(BADGE_DEFS.find(b=>b.id==='master'));
-  if(isCrowdFav) earned.push(BADGE_DEFS.find(b=>b.id==='crowd_fav'));
-  // Condition-based badges
-  BADGE_DEFS.forEach(b=>{
-    if(!b.cond)return; // positional — handled above
-    if(b.cond(u)) earned.push(b);
-  });
-  // Deduplicate
-  const seen=new Set();
-  return earned.filter(b=>{ if(seen.has(b.id))return false; seen.add(b.id); return true; });
+function getScore(u){
+  return (u.challengeWins||0)*50+(u.challengesJoined||0)*10+(u.totalVotesReceived||0)*2;
 }
 
-function renderBadges(badges){
-  if(!badges.length)return'';
-  return '<div class="lb-badges">'+badges.map(b=>
-    `<span class="lb-badge ${b.cls}" title="${b.tip||''}">${b.icon} ${b.label}</span>`
-  ).join('')+'</div>';
+function getBadge(u){
+  const score=getScore(u);
+  return (BADGES.slice().reverse().find(b=>score>=b.min)||BADGES[0]);
 }
 
-// ── Record a win event on user doc ────────────────
-// Call this whenever a challenge winner is determined
-async function recordWinEvent(uid){
-  try{
-    await db.collection('users').doc(uid).update({
-      challengeWins: firebase.firestore.FieldValue.increment(1),
-      winEvents: firebase.firestore.FieldValue.arrayUnion(ts()),
-      currentStreak: firebase.firestore.FieldValue.increment(1),
-    });
-  }catch(e){ console.warn('recordWinEvent failed',e); }
+function getActivityBadge(u){
+  // Extra badge for active participants
+  const joined=(u.challengesJoined||0);
+  if(joined>=20) return {label:'Veteran',cls:'badge-active'};
+  if(joined>=5)  return {label:'Active',cls:'badge-active'};
+  return null;
 }
 
-// Reset streak on loss
-async function recordLossEvent(uid){
-  try{
-    await db.collection('users').doc(uid).update({
-      challengeLosses: firebase.firestore.FieldValue.increment(1),
-      currentStreak: 0,
-    });
-  }catch(e){ console.warn('recordLossEvent failed',e); }
-}
-
-// ── Detect demon slayer ───────────────────────────
-// Call after a 1v1 result — pass winner uid, loser uid, and sorted users array
-async function checkDemonSlay(winnerUid, loserUid, sortedUsers){
-  try{
-    const wIdx=sortedUsers.findIndex(u=>u.uid===winnerUid);
-    const lIdx=sortedUsers.findIndex(u=>u.uid===loserUid);
-    if(wIdx===-1||lIdx===-1)return;
-    // Winner ranked lower (higher number) beat someone ranked 10+ spots above
-    if(lIdx-wIdx<=-10){
-      await db.collection('users').doc(winnerUid).update({
-        demonSlays: firebase.firestore.FieldValue.increment(1),
-      });
-    }
-  }catch(e){ console.warn('checkDemonSlay failed',e); }
-}
-
-// ── Init leaderboard ──────────────────────────────
 function initLeaderboard(){
   const body=document.getElementById('leaderboard-body');
   if(!body)return;
   body.innerHTML=`<div class="lb-loading"><div class="spin"></div><span>Loading rankings...</span></div>`;
+
+  // Unsubscribe previous listener
   if(lbUnsub){ lbUnsub(); lbUnsub=null; }
 
-  // Fetch top 100 by challengeWins — then re-sort client-side by full score
-  // (Firestore index: challengeWins desc)
+  // Real-time listener — ordered by challengeWins desc, limit 100
   lbUnsub=db.collection('users')
     .orderBy('challengeWins','desc')
+    .orderBy('totalVotesReceived','desc')
     .limit(100)
     .onSnapshot(snap=>{
       if(snap.empty){
@@ -1849,24 +1710,37 @@ function initLeaderboard(){
           <div class="lb-empty">
             <i class="fa-solid fa-ranking-star"></i>
             <h3>No rankings yet</h3>
-            <p>Enter challenges, win votes, climb the board.</p>
+            <p>Enter challenges and win votes to appear here.</p>
           </div>`;
         return;
       }
 
-      // Build array and sort by full composite score
-      let users=[];
+      const users=[];
       snap.forEach(doc=>users.push({id:doc.id,...doc.data()}));
-      users.sort((a,b)=>calcScore(b)-calcScore(a));
 
-      // Determine crowd favourite — user with most totalVotesReceived in last 30 days
-      // (approximate: use totalVotesReceived as proxy — exact 30-day needs subcollection)
-      const crowdFavUid=users.reduce((best,u)=>
-        (u.totalVotesReceived||0)>(best.totalVotesReceived||0)?u:best
-      , users[0]).uid;
+      // Find current user rank
+      const myRank=users.findIndex(u=>u.uid===CU.uid)+1;
 
-      // Hero HTML
-      const heroHTML=`
+      // Build top 3 podium
+      const top3=users.slice(0,3);
+      const podiumHTML=buildLBPodium(top3);
+
+      // Build rows 4–100
+      let rowsHTML='';
+      users.forEach((u,i)=>{
+        const rank=i+1;
+        if(rank<=3)return; // skip — shown in podium
+        rowsHTML+=buildLBRow(u,rank);
+      });
+
+      // My rank callout if outside top 100 visible area
+      let myRowHTML='';
+      if(myRank>0&&myRank>3){
+        const me=users[myRank-1];
+        myRowHTML=buildLBRow(me,myRank,true);
+      }
+
+      body.innerHTML=`
         <div class="lb-hero">
           <div class="lb-hero-title">RANKINGS</div>
           <div class="lb-hero-sub">@PICS NICHE · TOP 100</div>
@@ -1874,119 +1748,84 @@ function initLeaderboard(){
             <div class="lb-live-dot"></div>
             <span class="lb-live-txt">LIVE · UPDATES IN REAL TIME</span>
           </div>
-        </div>`;
-
-      // Podium for top 3
-      const podiumHTML=buildLBPodium(users.slice(0,3), crowdFavUid);
-
-      // My position banner if I'm in the list
-      const myIdx=users.findIndex(u=>u.uid===CU.uid);
-      const myRank=myIdx+1;
-
-      // Rows 4–100
-      let rowsHTML='';
-      users.forEach((u,i)=>{
-        if(i<3)return;
-        rowsHTML+=buildLBRow(u,i+1,u.uid===CU.uid,crowdFavUid);
-      });
-
-      // My sticky row shown above the list if I'm outside top 3
-      let myRowHTML='';
-      if(myRank>3){
-        myRowHTML=`
-          <div class="lb-my-pos-banner">
-            <span class="lb-my-pos-label">YOUR POSITION</span>
-            ${buildLBRow(users[myIdx],myRank,true,crowdFavUid)}
-          </div>`;
-      }
-
-      body.innerHTML=heroHTML+podiumHTML+`
+        </div>
+        ${podiumHTML}
         <div class="lb-list">
-          <div class="lb-section-hdr">FULL RANKINGS</div>
-          ${myRowHTML}
-          ${rowsHTML||'<div style="padding:24px;text-align:center;color:rgba(255,255,255,.25);font-size:13px;">More players coming soon</div>'}
+          <div class="lb-section-hdr">ALL RANKINGS</div>
+          ${myRank>0&&myRank<=3?'':myRowHTML}
+          ${rowsHTML||'<div style="padding:20px;text-align:center;color:rgba(255,255,255,.25);font-size:13px;">More users coming soon</div>'}
         </div>`;
-
     }, err=>{
       body.innerHTML=`<div class="lb-empty"><i class="fa-solid fa-triangle-exclamation"></i><h3>Error loading</h3><p>${err.message}</p></div>`;
     });
 }
 
-// ── Podium ────────────────────────────────────────
-function buildLBPodium(top3, crowdFavUid){
+function buildLBPodium(top3){
   if(!top3.length)return'';
 
-  function podSlot(u, rank){
+  function podSlot(u,rank){
     if(!u)return'<div class="podium-slot"></div>';
-    const badges=getUserBadges(u,rank,u.uid===crowdFavUid);
+    const badge=getBadge(u);
     const avClass=rank===1?'gold':rank===2?'silver':'bronze';
-    const sz=rank===1?72:54;
     const avHTML=u.photoURL
-      ?`<div class="lb-av ${avClass}" style="width:${sz}px;height:${sz}px;"><img src="${u.photoURL}"/></div>`
-      :`<div class="lb-av ${avClass}" style="width:${sz}px;height:${sz}px;font-size:${rank===1?28:20}px;">${(u.displayName||'?').charAt(0).toUpperCase()}</div>`;
+      ?`<div class="lb-av ${avClass}" style="width:${rank===1?70:52}px;height:${rank===1?70:52}px;"><img src="${u.photoURL}"/></div>`
+      :`<div class="lb-av ${avClass}" style="width:${rank===1?70:52}px;height:${rank===1?70:52}px;font-size:${rank===1?26:20}px;">${(u.displayName||'?').charAt(0).toUpperCase()}</div>`;
+    const crown=rank===1?'<div class="podium-crown">👑</div>':'';
     const medals=['','🥇','🥈','🥉'];
-    const baseH=rank===1?64:rank===2?42:28;
-    const score=calcScore(u);
-    const topBadge=badges[0];
+    const baseH=rank===1?60:rank===2?40:28;
     return `
       <div class="podium-slot ${rank===1?'first':rank===2?'second':'third'}" onclick="viewProfile('${u.uid}')">
         <div class="podium-av-wrap">
-          ${rank===1?'<div class="podium-crown">👑</div>':''}
+          ${crown}
           ${avHTML}
         </div>
-        ${topBadge?`<div class="podium-badge-chip ${topBadge.cls}">${topBadge.icon} ${topBadge.label}</div>`:''}
         <div class="podium-name">${esc(u.displayName||'')}</div>
         <div class="podium-un">${esc(u.username||'')}</div>
-        <div class="podium-score">${fmtN(score)} pts</div>
-        <div class="podium-wins">${fmtN(u.challengeWins||0)}W · ${fmtN(u.challengesJoined||0)} entries</div>
+        <div class="podium-votes">${fmtN(u.challengeWins||0)} wins</div>
+        <div class="podium-rank ${rank===1?'rk-1':rank===2?'rk-2':'rk-3'}">${medals[rank]}</div>
         <div class="podium-base" style="height:${baseH}px;"></div>
       </div>`;
   }
 
+  const second=top3[1]||null;
+  const winner=top3[0];
+  const third=top3[2]||null;
+
   return `
-    <div class="podium-wrap">
-      <div class="podium">
-        ${podSlot(top3[1]||null,2)}
-        ${podSlot(top3[0],1)}
-        ${podSlot(top3[2]||null,3)}
+    <div style="background:linear-gradient(to bottom,#1a0a05,var(--black));border-bottom:1px solid var(--bord);">
+      <div class="podium" style="padding:24px 16px 20px;">
+        ${podSlot(second,2)}${podSlot(winner,1)}${podSlot(third,3)}
       </div>
     </div>`;
 }
 
-// ── Row ───────────────────────────────────────────
-function buildLBRow(u, rank, isMe=false, crowdFavUid=''){
-  const score=calcScore(u);
-  const badges=getUserBadges(u,rank,u.uid===crowdFavUid);
+function buildLBRow(u,rank,isMe=false){
+  const badge=getBadge(u);
+  const actBadge=getActivityBadge(u);
   const rankClass=rank===1?'lbr-1':rank===2?'lbr-2':rank===3?'lbr-3':'lbr-n';
   const avHTML=u.photoURL
-    ?`<div class="lb-av${rank===1?' gold':rank===2?' silver':rank===3?' bronze':''}" style="width:38px;height:38px;"><img src="${u.photoURL}"/></div>`
-    :`<div class="lb-av${rank===1?' gold':rank===2?' silver':rank===3?' bronze':''}" style="width:38px;height:38px;font-size:14px;">${(u.displayName||'?').charAt(0).toUpperCase()}</div>`;
+    ?`<div class="lb-av"><img src="${u.photoURL}"/></div>`
+    :`<div class="lb-av">${(u.displayName||'?').charAt(0).toUpperCase()}</div>`;
+
+  const badgesHTML=`
+    <div class="lb-badges">
+      <span class="lb-badge ${badge.cls}">${badge.label}</span>
+      ${actBadge?`<span class="lb-badge ${actBadge.cls}">${actBadge.label}</span>`:''}
+      ${(u.challengeWins||0)>=5?`<span class="lb-badge badge-wins">${u.challengeWins}W</span>`:''}
+    </div>`;
 
   return `
     <div class="lb-row${isMe?' lb-me':''}" onclick="viewProfile('${u.uid}')">
       <div class="lb-rank ${rankClass}">${rank}</div>
       ${avHTML}
-      <div>
       <div class="lb-info">
-        <div class="lb-name">${esc(u.displayName||'')}${isMe?' <span class="lb-you-tag">(You)</span>':''}</div>
+        <div class="lb-name">${esc(u.displayName||'')}${isMe?' <span style="font-size:9px;color:var(--or);">(You)</span>':''}</div>
         <div class="lb-username">${esc(u.username||'')}</div>
-        ${badges.length?renderBadges(badges):''}
+        ${badgesHTML}
       </div>
-       <div class="lb-stats-col">
-        <div class="lb-stat-row">
-          <span class="lb-stat-val">${fmtN(u.challengeWins||0)}</span>
-          <span class="lb-stat-lbl">WINS</span>
-        </div>
-        <div class="lb-stat-row">
-          <span class="lb-stat-val lb-stat-entries">${fmtN(u.challengesJoined||0)}</span>
-          <span class="lb-stat-lbl">ENTRIES</span>
-        </div>
-        <div class="lb-stat-row">
-          <span class="lb-stat-val lb-stat-votes">${fmtN(u.totalVotesReceived||0)}</span>
-          <span class="lb-stat-lbl">VOTES</span>
-        </div>
+      <div class="lb-wins">
+        <div class="lb-wins-num">${fmtN(u.challengeWins||0)}</div>
+        <div class="lb-wins-lbl">WINS</div>
       </div>
-      </div>
-     
     </div>`;
 }

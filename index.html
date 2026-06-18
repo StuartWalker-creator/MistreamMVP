@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
 <meta name="theme-color" content="#060608"/>
+<meta name="description" content="Join the platform for competitors, Challenge, and vote on winners. Do you Dare, to take on the ranks?"/>
 <title>MiStream</title>
 <link rel="manifest" href="manifest.json"/>
 <link rel="stylesheet" href="style.css"/>
@@ -29,7 +30,7 @@
   <div id="v-login" class="auth-view">
     <div class="auth-top">
       <div class="brand lg"><span class="mi">MI</span><span class="st">STREAM</span></div>
-      <p>Where Comedians prove themselves.</p>
+      <p>Where creators prove themselves.</p>
     </div>
     <div class="auth-card">
       <h2>Welcome back</h2>
@@ -45,7 +46,7 @@
   <div id="v-register" class="auth-view hidden">
     <div class="auth-top">
       <div class="brand lg"><span class="mi">MI</span><span class="st">STREAM</span></div>
-      <p>Join Uganda's competition arena.</p>
+      <p>Join the competition arena.</p>
     </div>
     <div class="auth-card">
       <h2>Create Account</h2>
@@ -57,15 +58,15 @@
           <input type="file" id="reg-photo-f" accept="image/*" hidden onchange="prevRegPhoto(this)"/>
         </div>
       </div>
-      <div class="fg"><label>Your Name</label><input type="text" id="r-name" placeholder="e.g. MC Stubborn" oninput="updateUPrev()"/></div>
+      <div class="fg"><label>Your Display Name</label><input type="text" id="r-name" placeholder="e.g. King Lens" oninput="updateUPrev()"/></div>
       <div class="niche-locked">
-        <div class="nl-ico"><i class="fa-solid fa-masks-theater"></i></div>
-        <div class="nl-info"><div class="nl-lbl">Your Niche</div><div class="nl-val">Comedy <span>@comedy</span></div></div>
+        <div class="nl-ico"><i class="fa-solid fa-camera-retro"></i></div>
+        <div class="nl-info"><div class="nl-lbl">Your Niche</div><div class="nl-val">Pics <span>@pics</span></div></div>
         <div class="nl-badge">BETA</div>
       </div>
       <div class="upreview hidden" id="upreview">
         <span class="upl">Your identity</span>
-        <span class="upn" id="upn">name@comedy</span>
+        <span class="upn" id="upn">name@pics</span>
       </div>
       <div class="fg"><label>Email</label><input type="email" id="r-email" placeholder="you@email.com"/></div>
       <div class="fg"><label>Password</label><input type="password" id="r-pass" placeholder="Minimum 6 characters"/></div>
@@ -85,52 +86,42 @@
 
     <!-- ══ ARENA (Challenge Feed) ══ -->
     <div class="scr active" id="scr-arena">
-      <!-- Full screen snap scroll of challenge cards + battleground -->
       <div class="arena-feed" id="arena-feed"></div>
     </div>
 
-    <!-- ══ CREATE CHALLENGE ══ -->
-    <div class="scr" id="scr-create">
+    <!-- ══ LEADERBOARD ══ -->
+    <div class="scr" id="scr-leaderboard">
       <div class="pg-hdr dark">
         <div class="brand sm"><span class="mi">MI</span><span class="st">STREAM</span></div>
-        <div class="top-av" id="top-av" onclick="showScr('profile')"></div>
+        <div class="top-av" id="top-av-lb" onclick="showScr('profile')"></div>
+      </div>
+      <div id="leaderboard-body" class="lb-screen-body"></div>
+    </div>
+
+    <!-- ══ ADMIN CREATE CHALLENGE (admin only — not in nav) ══ -->
+    <div class="scr" id="scr-create">
+      <div class="pg-hdr light back-hdr">
+        <button class="bk-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button>
+        <h2><i class="fa-solid fa-shield-halved"></i> New Challenge</h2>
       </div>
       <div class="create-body">
         <div class="create-intro">
           <div class="ci-icon"><i class="fa-solid fa-shield-halved"></i></div>
           <div>
             <div class="ci-title">Create a Challenge</div>
-            <div class="ci-sub">Make a topic.Other Creators will submit their versions and compete for votes..</div>
+            <div class="ci-sub">Set a topic. Users submit their best photo. Community votes on pairs.</div>
           </div>
         </div>
         <div class="my-id" id="my-id"></div>
         <div class="fg light"><label>Challenge Topic <span class="req">*</span></label>
-          <input type="text" id="chal-title" placeholder='e.g. "The worst excuse for being late"' maxlength="80" class="input-light"/>
-          <div class="title-chips" id="title-chips">
-            <!--<div class="chip" onclick="useChip(this)">Nobody can beat me at...</div>
-            <div class="chip" onclick="useChip(this)">Who is funnier than...</div>
-            <div class="chip" onclick="useChip(this)">I challenge anyone to...</div>
-            <div class="chip" onclick="useChip(this)">Prove you're better at...</div>-->
-          </div>
+          <input type="text" id="chal-title" placeholder='e.g. "Best sunset photo you have ever taken"' maxlength="80" class="input-light"/>
         </div>
         <div class="fg light"><label>Description <span style="opacity:.5;font-weight:400;">(optional)</span></label>
-          <textarea id="chal-desc" placeholder="What's the challenge about? Any rules?" rows="2" maxlength="200" class="input-light"></textarea>
-        </div>
-        <div class="fg light">
-          <label>Your Entry <span class="req">*</span></label>
-          <p class="field-hint">You must submit the first entry to start the challenge.</p>
-          <div class="mdrop" id="entry-drop" onclick="document.getElementById('entry-media').click()">
-            <i class="fa-solid fa-photo-film"></i>
-            <span>Add your entry video(15 seconds to 3minutes long) or photo</span>
-            <input type="file" id="entry-media" accept="image/*,video/*" hidden onchange="prevEntryMedia(this)"/>
-          </div>
-          <div id="entry-media-prev" class="hidden"></div>
-          <div class="fg light" style="margin-top:10px;margin-bottom:0;">
-            <input type="text" id="entry-cap" placeholder="Entry optional caption — your claim in one line" maxlength="120" class="input-light"/>
-          </div>
+          <textarea id="chal-desc" placeholder="Any rules or context for participants?" rows="2" maxlength="200" class="input-light"></textarea>
         </div>
         <div class="fg light">
           <label>Deadline <span class="req">*</span></label>
+          <p class="field-hint">Timer starts when the first entry is submitted, not when challenge is created.</p>
           <select id="chal-expiry" class="sel-light">
             <option value="1">1 Day</option>
             <option value="2">2 Days</option>
@@ -142,7 +133,7 @@
         </div>
         <div class="public-note">
           <i class="fa-solid fa-globe"></i>
-          <p>This challenge is <strong>public</strong> — anyone in @comedy can vote or join by submitting their entry.</p>
+          <p>This challenge is <strong>public</strong> — all @pics users are notified and can enter.</p>
         </div>
         <div class="errmsg hidden" id="create-err"></div>
         <button class="btn-or w" onclick="submitChallenge()"><i class="fa-solid fa-flag"></i> <span>Launch Challenge</span></button>
@@ -163,14 +154,14 @@
       <div id="viewprofile-body"></div>
     </div>
 
-<!-- RESULTS SCREEN -->
-<div class="scr" id="scr-results">
-  <div class="pg-hdr light back-hdr">
-    <button class="bk-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button>
-    <h2 id="results-title">Challenge Results</h2>
-  </div>
-  <div id="results-body"></div>
-</div>
+    <!-- RESULTS SCREEN -->
+    <div class="scr" id="scr-results">
+      <div class="pg-hdr light back-hdr">
+        <button class="bk-btn" onclick="goBack()"><i class="fa-solid fa-chevron-left"></i></button>
+        <h2 id="results-title">Challenge Results</h2>
+      </div>
+      <div id="results-body"></div>
+    </div>
 
     <!-- ══ NOTIFICATIONS ══ -->
     <div class="scr" id="scr-notifications">
@@ -182,11 +173,15 @@
 
   </div>
 
-  <!-- BOTTOM NAV -->
+  <!-- BOTTOM NAV — leaderboard replaces create for regular users -->
   <nav class="bnav">
     <div class="bn active" id="bn-arena" onclick="showScr('arena')">
       <i class="fa-solid fa-trophy"></i>
       <span>Arena</span>
+    </div>
+    <div class="bn" id="bn-leaderboard" onclick="showScr('leaderboard')">
+      <i class="fa-solid fa-ranking-star"></i>
+      <span>Ranks</span>
     </div>
     <div class="bn" id="bn-notifications" onclick="showScr('notifications')">
       <div class="bn-notif-wrap">
@@ -194,9 +189,6 @@
         <span class="notif-dot hidden" id="notif-dot"></span>
       </div>
       <span>Alerts</span>
-    </div>
-    <div class="bn-plus" onclick="showScr('create')">
-      <i class="fa-solid fa-plus"></i>
     </div>
     <div class="bn" id="bn-profile" onclick="showScr('profile')">
       <i class="fa-regular fa-user"></i>
@@ -209,13 +201,13 @@
     <div class="cs-backdrop" onclick="closeComments()"></div>
     <div class="cs-panel">
       <div class="cs-drag"></div>
-<div class="cs-hdr">
-  <div style="display:flex;justify-content:space-between; align-items:center;flex:1;min-width:0;">
-    <h3><i class="fa-regular fa-comment-dots"></i> Comments <span id="cs-count"></span></h3>
-    <div id="cs-entry-context" class="hidden" style="display:flex;align-items:center;"></div>
-  </div>
-  <button onclick="closeComments()" style="align-self:flex-start; margin-bottom:16px; margin-left:10px;"><i class="fa-solid fa-xmark"></i></button>
-</div>
+      <div class="cs-hdr">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex:1;min-width:0;">
+          <h3><i class="fa-regular fa-comment-dots"></i> Comments <span id="cs-count"></span></h3>
+          <div id="cs-entry-context" class="hidden" style="display:flex;align-items:center;"></div>
+        </div>
+        <button onclick="closeComments()" style="align-self:flex-start;margin-bottom:16px;margin-left:10px;"><i class="fa-solid fa-xmark"></i></button>
+      </div>
       <div id="cs-list" class="cs-list"></div>
       <div class="cs-input">
         <div class="com-av-sm" id="cs-av"></div>
@@ -233,32 +225,32 @@
   <!-- JOIN CHALLENGE SHEET -->
   <div class="cs-overlay hidden" id="join-overlay">
     <div class="cs-backdrop" onclick="closeJoin()"></div>
-    <div class="cs-panel" style="height:90%;">
+    <div class="cs-panel" style="height:85%;">
       <div class="cs-drag"></div>
       <div class="cs-hdr">
-        <h3><i class="fa-solid fa-shield-halved"></i> Submit Your Entry</h3>
+        <h3><i class="fa-solid fa-image"></i> Submit Your entry</h3>
         <button onclick="closeJoin()"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="join-body">
         <div class="join-chal-info" id="join-chal-info"></div>
         <div class="picker-tabs">
-          <button class="ptab active" onclick="setJoinTab(this,'existing')">Existing Entry</button>
-          <button class="ptab" onclick="setJoinTab(this,'new')">New Entry</button>
+          <button class="ptab active" onclick="setJoinTab(this,'existing')">My Previous Photos</button>
+          <button class="ptab" onclick="setJoinTab(this,'new')">Upload New Photo</button>
         </div>
         <div id="join-existing" class="existing-list"></div>
         <div id="join-new" class="hidden">
           <div class="mdrop sm" onclick="document.getElementById('join-media').click()">
-            <i class="fa-solid fa-photo-film"></i><span>Add video or photo</span>
-            <input type="file" id="join-media" accept="image/*,video/*" hidden onchange="prevJoinMedia(this)"/>
+            <i class="fa-solid fa-image"></i><span>Choose a photo from your gallery</span>
+            <input type="file" id="join-media" accept="image/*" hidden onchange="prevJoinMedia(this)"/>
           </div>
           <div id="join-media-prev" class="hidden"></div>
           <div class="fg light" style="margin-top:10px;">
-            <input type="text" id="join-cap" placeholder="Your entry caption — your claim" maxlength="120" class="input-light"/>
+            <input type="text" id="join-cap" placeholder="Your caption — your claim in one line" maxlength="120" class="input-light"/>
           </div>
         </div>
         <div class="errmsg hidden" id="join-err"></div>
         <button class="btn-or w" style="margin-top:14px;" onclick="submitJoin()">
-          <i class="fa-solid fa-shield-halved"></i> <span>Submit Entry</span>
+          <i class="fa-solid fa-image"></i> <span>Submit Entry</span>
         </button>
       </div>
     </div>
@@ -266,31 +258,31 @@
 
   <!-- TOAST -->
   <div class="toast hidden" id="toast"></div>
-  
+
   <!-- FEEDBACK MODAL -->
-<div class="cs-overlay hidden" id="feedback-overlay">
-  <div class="cs-backdrop" onclick="closeFeedback()"></div>
-  <div class="cs-panel" style="height:auto;max-height:75%;border-radius:20px 20px 0 0;">
-    <div class="cs-drag"></div>
-    <div class="cs-hdr">
-      <h3><i class="fa-regular fa-comment-dots"></i> Share Feedback</h3>
-      <button onclick="closeFeedback()"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <div style="padding:16px 20px 32px;">
-      <p style="font-size:13px;color:var(--mu);line-height:1.7;margin-bottom:16px;">Help us improve MiStream. Share anything — what you love, what's broken, what you wish existed. We read every single one.</p>
-      <textarea id="feedback-text" placeholder="Your feedback or suggestion..." rows="5" maxlength="500"
-        style="width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:12px;font-size:14px;font-family:'Syne',sans-serif;color:var(--tx);resize:none;outline:none;"
-        oninput="document.getElementById('feedback-send').disabled=!this.value.trim()"></textarea>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;margin-bottom:14px;">
-        <span style="font-family:'Space Mono',monospace;font-size:9px;color:var(--mu2);" id="feedback-char">0/500</span>
+  <div class="cs-overlay hidden" id="feedback-overlay">
+    <div class="cs-backdrop" onclick="closeFeedback()"></div>
+    <div class="cs-panel" style="height:auto;max-height:75%;border-radius:20px 20px 0 0;">
+      <div class="cs-drag"></div>
+      <div class="cs-hdr">
+        <h3><i class="fa-regular fa-comment-dots"></i> Share Feedback</h3>
+        <button onclick="closeFeedback()"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <div class="errmsg hidden" id="feedback-err"></div>
-      <button class="btn-or w" id="feedback-send" disabled onclick="submitFeedback()">
-        <i class="fa-solid fa-paper-plane"></i> <span>Send Feedback</span>
-      </button>
+      <div style="padding:16px 20px 32px;">
+        <p style="font-size:13px;color:var(--mu);line-height:1.7;margin-bottom:16px;">Help us improve MiStream. Share anything — what you love, what's broken, what you wish existed. We read every single one.</p>
+        <textarea id="feedback-text" placeholder="Your feedback or suggestion..." rows="5" maxlength="500"
+          style="width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:12px;font-size:14px;font-family:'Syne',sans-serif;color:var(--tx);resize:none;outline:none;"
+          oninput="document.getElementById('feedback-send').disabled=!this.value.trim()"></textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;margin-bottom:14px;">
+          <span style="font-family:'Space Mono',monospace;font-size:9px;color:var(--mu2);" id="feedback-char">0/500</span>
+        </div>
+        <div class="errmsg hidden" id="feedback-err"></div>
+        <button class="btn-or w" id="feedback-send" disabled onclick="submitFeedback()">
+          <i class="fa-solid fa-paper-plane"></i> <span>Send Feedback</span>
+        </button>
+      </div>
     </div>
   </div>
-</div>
 
 </div>
 

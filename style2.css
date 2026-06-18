@@ -499,41 +499,12 @@ padding: 6px 6px;  font-weight: 700;
 .badge-master{background:rgba(209,30,185,.15);border:1px solid rgba(209,30,185,.25);color:#e879f9;}
 .badge-ultra{background:rgba(245,180,50,.25);border:1px solid rgba(245,180,50,.5);color:var(--go);}
 .badge-active{background:rgba(29,158,117,.1);border:1px solid rgba(29,158,117,.2);color:#5dcaa5;}
-.lb-stats-col{display:flex;flex-direction:row;gap:8px;align-items:flex-start;flex-shrink:0;}
-.lb-stat-row{display:flex;flex-direction:column;align-items:center}
-.lb-stat-val{font-family:'Bebas Neue',sans-serif;font-size:14px;color:#fff;line-height:1; opacity: 0.7;}
-.lb-stat-entries{color:#93c5fd;}
-.lb-stat-votes{color:#d8b4fe;}
-.lb-stat-lbl{font-family:'Space Mono',monospace;font-size:6px;color:rgba(255,255,255,.25);letter-spacing:.5px;}
-.lb-you-tag{font-size:9px;color:var(--or);margin-left:4px;font-weight:400;}
-.lb-my-pos-banner{background:rgba(255,92,26,.06);border-top:1px solid rgba(255,92,26,.15);border-bottom:1px solid rgba(255,92,26,.15);margin-bottom:4px;}
-.lb-my-pos-banner .lb-my-pos-label{font-family:'Space Mono',monospace;font-size:8px;color:var(--or);letter-spacing:1.5px;padding:6px 16px 0;display:block;}
+.lb-wins{text-align:right;flex-shrink:0;}
+.lb-wins-num{font-family:'Bebas Neue',sans-serif;font-size:22px;color:#fff;line-height:1;}
+.lb-wins-lbl{font-family:'Space Mono',monospace;font-size:7px;color:rgba(255,255,255,.3);text-align:right;}
 .lb-empty{display:flex;flex-direction:column;align-items:center;gap:14px;padding:60px 24px;text-align:center;}
 .lb-empty i{font-size:40px;color:rgba(255,255,255,.15);}
 .lb-empty h3{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1px;color:#fff;}
 .lb-empty p{font-size:13px;color:rgba(255,255,255,.4);line-height:1.6;}
 .lb-loading{display:flex;align-items:center;justify-content:center;gap:10px;padding:60px 20px;color:rgba(255,255,255,.3);font-size:13px;}
-
-/* ── Badge palette ── */
-.badge-master-crown{background:linear-gradient(135deg,rgba(245,180,50,.25),rgba(255,140,0,.2));border:1px solid rgba(245,180,50,.5);color:var(--go);}
-.badge-demon{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.35);color:#fca5a5;}
-.badge-unbeaten{background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.35);color:#c4b5fd;}
-.badge-streak{background:rgba(255,92,26,.15);border:1px solid rgba(255,92,26,.35);color:var(--or);}
-.badge-crowd{background:rgba(236,72,153,.15);border:1px solid rgba(236,72,153,.35);color:#f9a8d4;}
-.badge-veteran{background:rgba(100,116,139,.15);border:1px solid rgba(100,116,139,.35);color:#94a3b8;}
-.badge-relentless{background:rgba(20,184,166,.15);border:1px solid rgba(20,184,166,.35);color:#5eead4;}
-.badge-challenger{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.45);}
-/* Keep old classes for backward compat */
-.badge-wins{background:rgba(245,180,50,.15);border:1px solid rgba(245,180,50,.25);color:var(--go);}
-.badge-rookie{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.4);}
-.badge-pro{background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.25);color:#93c5fd;}
-.badge-expert{background:rgba(29,158,117,.15);border:1px solid rgba(29,158,117,.25);color:#5dcaa5;}
-.badge-elite{background:rgba(255,92,26,.15);border:1px solid rgba(255,92,26,.25);color:var(--or);}
-.badge-master{background:rgba(245,180,50,.2);border:1px solid rgba(245,180,50,.4);color:var(--go);}
-.badge-ultra{background:rgba(245,180,50,.25);border:1px solid rgba(245,180,50,.5);color:var(--go);}
-.badge-active{background:rgba(29,158,117,.1);border:1px solid rgba(29,158,117,.2);color:#5dcaa5;}
-
-/* ── Podium badge chip ── */
-.podium-badge-chip{font-family:'Space Mono',monospace;font-size:7px;padding:3px 8px;border-radius:20px;margin:4px auto 0;display:inline-block;letter-spacing:.5px;}
-.podium-score{font-family:'Bebas Neue',sans-serif;font-size:13px;color:var(--or);margin-top:3px;letter-spacing:.5px;}
-.podium-wins{font-family:'Space Mono',monospace;font-size:8px;color:rgba(255,255,255,.3);margin-top:1px;}
+.lb-you-row{background:rgba(255,92,26,.08);border-top:1px solid rgba(255,92,26,.15);border-bottom:1px solid rgba(255,92,26,.15);margin:8px 0;}

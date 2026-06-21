@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
 <meta name="theme-color" content="#060608"/>
+<meta name="description" content="Join the platform for competitors, Challenge, and vote on winners. Do you Dare, to take on the ranks?"/>
 <title>MiStream</title>
 <link rel="manifest" href="manifest.json"/>
 <link rel="stylesheet" href="style.css"/>
@@ -57,7 +58,7 @@
           <input type="file" id="reg-photo-f" accept="image/*" hidden onchange="prevRegPhoto(this)"/>
         </div>
       </div>
-      <div class="fg"><label>Your Name</label><input type="text" id="r-name" placeholder="e.g. King Lens" oninput="updateUPrev()"/></div>
+      <div class="fg"><label>Your Display Name</label><input type="text" id="r-name" placeholder="e.g. King Lens" oninput="updateUPrev()"/></div>
       <div class="niche-locked">
         <div class="nl-ico"><i class="fa-solid fa-camera-retro"></i></div>
         <div class="nl-info"><div class="nl-lbl">Your Niche</div><div class="nl-val">Pics <span>@pics</span></div></div>
@@ -69,10 +70,6 @@
       </div>
       <div class="fg"><label>Email</label><input type="email" id="r-email" placeholder="you@email.com"/></div>
       <div class="fg"><label>Password</label><input type="password" id="r-pass" placeholder="Minimum 6 characters"/></div>
-      <div class="fg">
-        <label>Gate <span style="opacity:.5;font-weight:400;">(only NSS students allowed!)</span></label>
-        <input type="text" id="r-gate" placeholder="Nickname for Mr.Ssemakula" autocomplete="off"/>
-      </div>
       <div class="errmsg hidden" id="r-err"></div>
       <button class="btn-or w" id="reg-btn" onclick="doRegister()"><span>Claim My Identity</span><i class="fa-solid fa-arrow-right"></i></button>
       <div class="auth-or"><span>or</span></div>
@@ -231,7 +228,7 @@
     <div class="cs-panel" style="height:85%;">
       <div class="cs-drag"></div>
       <div class="cs-hdr">
-        <h3><i class="fa-solid fa-image"></i> Submit Your Photo</h3>
+        <h3><i class="fa-solid fa-image"></i> Submit Your entry</h3>
         <button onclick="closeJoin()"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="join-body">

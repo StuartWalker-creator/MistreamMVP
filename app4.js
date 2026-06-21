@@ -131,19 +131,14 @@ function updateUPrev(){
   document.getElementById('upn').textContent=name?`${name}@pics`:'name@pics';
   prev.classList.toggle('hidden',!name);
 }
-const GATE_ANSWER='sununu'; // nickname for Mr.Ssemakula — case-insensitive
-
 async function doRegister(){
   const name=document.getElementById('r-name').value.trim();
   const email=document.getElementById('r-email').value.trim();
   const pass=document.getElementById('r-pass').value;
-  const gate=(document.getElementById('r-gate')?.value||'').trim();
   const err=document.getElementById('r-err'); err.classList.add('hidden');
   if(!name){showErr(err,'Enter your name.');return;}
   if(!email){showErr(err,'Enter your email.');return;}
   if(pass.length<6){showErr(err,'Password needs 6+ characters.');return;}
-  if(!gate){showErr(err,"You need the gate answer to sign up.");return;}
-  if(gate.toLowerCase()!==GATE_ANSWER){showErr(err,"That's not it. Ask someone who knows.");return;}
   const btn=document.getElementById('reg-btn'); setBtnLoad(btn,true);
   try{
     const username=name.toLowerCase().replace(/\s+/g,'')+'@pics';

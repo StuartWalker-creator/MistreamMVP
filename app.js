@@ -17,6 +17,121 @@ const messaging = firebase.messaging();
 const CLD_CLOUD  = 'dvdshonhc';
 const CLD_PRESET = 'mistream_uploads';
 
+// ── OneSignal background push ─────────────────────
+// Replace YOUR_ONESIGNAL_APP_ID with your real App ID from
+// OneSignal dashboard → Settings → Keys & IDs
+const ONESIGNAL_APP_ID = 'aef85f69-0133-4b36-865c-064264353814';
+
+function initOneSignal(){
+  // OneSignal SDK loaded via defer — wait for it
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal){
+    await OneSignal.init({
+      appId: ONESIGNAL_APP_ID,
+      // Soft prompt — asks user permission with a native browser dialog
+      // only after they interact with the page, not immediately on load
+      promptOptions:{
+        slidedown:{
+          prompts:[{
+            type:'push',
+            autoPrompt:false, // we control when to ask
+            text:{
+              actionMessage:"Get notified when new challenges drop and when you win.",
+              acceptButton:"Yes, notify me",
+              cancelButton:"Maybe later"
+            }
+          }]
+        }
+      },
+      // Service worker files — OneSignal needs its own SW file
+      // We merge it into the existing sw.js (see sw.js)
+      serviceWorkerParam:{ scope:'/' },
+      serviceWorkerPath:'sw.js',
+      allowLocalhostAsSecureOrigin:true // for local dev testing
+    });
+
+    // Tag user with their uid so we can target them specifically
+    if(CU){
+      await OneSignal.login(CU.uid).catch(()=>{});
+    }
+  });
+}
+
+// Ask for push permission — call this after user has had a moment
+// to understand the platform (called after first successful login)
+function askPushPermission(){
+  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  OneSignalDeferred.push(async function(OneSignal){
+    const permission = await OneSignal.Notifications.permission;
+    if(!permission){
+      // Slight delay so it doesn't fire the instant they log in
+      setTimeout(()=>{ OneSignal.Slidedown.promptPush(); }, 3000);
+    }
+  });
+}
+
+// Send a push to a specific user by their uid (external_id)
+// Used when: new challenge created, challenge won, voted on
+// NOTE: this sends via OneSignal REST API — needs your REST API key
+// For client-side MVP we write to Firestore and use a Cloud Function
+// OR we use OneSignal's Firestore extension. For now we store the
+// payload in Firestore and a simple relay picks it up.
+// SIMPLEST approach for zero-server MVP: call OneSignal's REST API
+// directly from client with your REST key (acceptable for MVP,
+// replace with a Cloud Function for production)
+async function pushToUser(toUid, title, message){
+  if(!ONESIGNAL_APP_ID||ONESIGNAL_APP_ID==='YOUR_ONESIGNAL_APP_ID')return;
+  // Requires your OneSignal REST API key — set below
+  // Get it from: OneSignal dashboard → Settings → Keys & IDs → REST API Key
+  const REST_KEY = 'YOUR_ONESIGNAL_REST_KEY';
+  if(!REST_KEY||REST_KEY==='YOUR_ONESIGNAL_REST_KEY')return;
+  try{
+    await fetch('https://onesignal.com/api/v1/notifications',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':`Basic ${REST_KEY}`
+      },
+      body:JSON.stringify({
+        app_id: ONESIGNAL_APP_ID,
+        include_aliases:{ external_id:[toUid] },
+        target_channel:'push',
+        headings:{ en: title },
+        contents:{ en: message },
+        // Small icon shown in notification tray on Android
+        small_icon:'icon-192',
+        // Tap opens MiStream
+        url: window.location.origin
+      })
+    });
+  }catch(e){ console.warn('OneSignal push failed',e); }
+}
+
+// Push to ALL users — used when admin creates a new challenge
+// Uses OneSignal segments (All = everyone subscribed)
+async function pushToAll(title, message){
+  if(!ONESIGNAL_APP_ID||ONESIGNAL_APP_ID==='YOUR_ONESIGNAL_APP_ID')return;
+  const REST_KEY = 'YOUR_ONESIGNAL_REST_KEY';
+  if(!REST_KEY||REST_KEY==='YOUR_ONESIGNAL_REST_KEY')return;
+  try{
+    await fetch('https://onesignal.com/api/v1/notifications',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'Authorization':`Basic ${REST_KEY}`
+      },
+      body:JSON.stringify({
+        app_id: ONESIGNAL_APP_ID,
+        included_segments:['Total Subscribed'],
+        headings:{ en: title },
+        contents:{ en: message },
+        small_icon:'icon-192',
+        url: window.location.origin
+      })
+    });
+  }catch(e){ console.warn('OneSignal broadcast failed',e); }
+}
+
 // ═══════════════════════════════════
 // LEVELS
 // ═══════════════════════════════════
@@ -87,6 +202,8 @@ function initApp(){
   trackSession();
   listenNotifs();
   requestNotifPermission();
+  initOneSignal();
+  askPushPermission();
   showScr('arena');
 }
 
@@ -131,19 +248,14 @@ function updateUPrev(){
   document.getElementById('upn').textContent=name?`${name}@pics`:'name@pics';
   prev.classList.toggle('hidden',!name);
 }
-const GATE_ANSWER='sununu'; // nickname for Mr.Ssemakula — case-insensitive
-
 async function doRegister(){
   const name=document.getElementById('r-name').value.trim();
   const email=document.getElementById('r-email').value.trim();
   const pass=document.getElementById('r-pass').value;
-  const gate=(document.getElementById('r-gate')?.value||'').trim();
   const err=document.getElementById('r-err'); err.classList.add('hidden');
   if(!name){showErr(err,'Enter your name.');return;}
   if(!email){showErr(err,'Enter your email.');return;}
   if(pass.length<6){showErr(err,'Password needs 6+ characters.');return;}
-  if(!gate){showErr(err,"You need the gate answer to sign up.");return;}
-  if(gate.toLowerCase()!==GATE_ANSWER){showErr(err,"That's not it. Ask someone who knows.");return;}
   const btn=document.getElementById('reg-btn'); setBtnLoad(btn,true);
   try{
     const username=name.toLowerCase().replace(/\s+/g,'')+'@pics';
@@ -932,6 +1044,12 @@ async function submitChallenge(){
 }
 
 async function notifyAllUsersNewChallenge(title, chalId){
+  // Background push to ALL subscribed users via OneSignal
+  await pushToAll(
+    '📸 New Challenge: ' + title,
+    'A new challenge just dropped — submit your best photo now!'
+  );
+  // In-app notification for when they open the app
   try{
     const snap=await db.collection('users').limit(50).get();
     const batch=db.batch();
@@ -1287,19 +1405,39 @@ function buildComment(d,commentId){
 }
 async function likeComment(commentId,btn){
   if(!comTarget)return;
+  // Prevent double-tap race condition
+  if(btn.dataset.pending==='1')return;
+  btn.dataset.pending='1';
   const lid=`${CU.uid}_${commentId}`;
-  const ref=db.collection('commentLikes').doc(lid);
-  const snap=await ref.get();
+  const likeRef=db.collection('commentLikes').doc(lid);
   const comRef=db.collection(comTarget.collection).doc(comTarget.docId).collection('comments').doc(commentId);
   const cnt=btn.querySelector('span');
-  if(snap.exists){
-    await ref.delete(); await comRef.update({likes:firebase.firestore.FieldValue.increment(-1)});
-    btn.classList.remove('liked'); if(cnt) cnt.textContent=Math.max(0,(parseInt(cnt.textContent)||0)-1);
-  } else {
-    await ref.set({commentId,userId:CU.uid,createdAt:ts()});
-    await comRef.update({likes:firebase.firestore.FieldValue.increment(1)});
-    btn.classList.add('liked'); if(cnt) cnt.textContent=(parseInt(cnt.textContent)||0)+1;
-  }
+  try{
+    const snap=await likeRef.get();
+    if(snap.exists){
+      // Unlike — use transaction so count never goes below 0
+      await db.runTransaction(async t=>{
+        const doc=await t.get(comRef);
+        const cur=doc.data()?.likes||0;
+        t.update(comRef,{likes:Math.max(0,cur-1)});
+        t.delete(likeRef);
+      });
+      btn.classList.remove('liked');
+      const fresh=await comRef.get();
+      if(cnt) cnt.textContent=Math.max(0,fresh.data()?.likes||0);
+    } else {
+      await db.runTransaction(async t=>{
+        const doc=await t.get(comRef);
+        const cur=doc.data()?.likes||0;
+        t.update(comRef,{likes:cur+1});
+        t.set(likeRef,{commentId,userId:CU.uid,createdAt:ts()});
+      });
+      btn.classList.add('liked');
+      const fresh=await comRef.get();
+      if(cnt) cnt.textContent=Math.max(0,fresh.data()?.likes||0);
+    }
+  }catch(e){ console.warn('likeComment error',e); }
+  btn.dataset.pending='0';
 }
 
 // ═══════════════════════════════════
@@ -1565,7 +1703,7 @@ async function checkAndAnnounceWinners(){
     await db.collection('users').doc(winner.authorId).update({
       challengeWins:firebase.firestore.FieldValue.increment(1)
     }).catch(()=>{});
-    // Notify all participants
+    // Notify all participants — in-app + background push
     const participants=await db.collection('entries').where('chalId','==',doc.id).get();
     const notified=new Set();
     participants.forEach(async e=>{
@@ -1576,8 +1714,14 @@ async function checkAndAnnounceWinners(){
       const msg=isWinner
         ?`🏆 You won the challenge "${d.title}"! Congratulations.`
         :`Challenge "${d.title}" ended. Winner: ${winner.authorUsername}. Check the results!`;
+      // In-app notification (Firestore)
       addNotif(uid,'win',msg,'challenges',doc.id);
+      // Background push — fires even when browser is closed
+      const pushTitle=isWinner?'🏆 You won!':'Challenge ended';
+      pushToUser(uid, pushTitle, msg);
     });
+    // Also record win event with timestamp for aged scoring
+    await recordWinEvent(winner.authorId).catch(()=>{});
   });
 }
 // Run winner check on load and every 5 minutes

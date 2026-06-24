@@ -201,7 +201,7 @@ function initApp(){
   setMyId();
   trackSession();
   listenNotifs();
-  //requestNotifPermission();
+  requestNotifPermission();
   initOneSignal();
   askPushPermission();
   showScr('arena');
@@ -849,113 +849,77 @@ autoplayFirstVid(chalId, idx);
     if(pairs.length<=1) hint.style.display='none';
     else hint.textContent=`Pair ${idx+1} of ${pairs.length} · swipe to compare`;
   }
-  // checkPairVoted resets buttons to clean state synchronously,
-  // then checks Firestore and marks voted state if needed.
-  // No separate button update needed here.
+  // Check voted on new pair
   if(pairs[idx]) checkPairVoted(chalId,pairs[idx],idx);
+  // Update vote button labels
+  const pa=pairs[idx];
+  const btnA=document.getElementById(`va-${chalId}`);
+  const btnB=document.getElementById(`vb2-${chalId}`);
+  if(pa&&btnA&&btnB){
+    const nameA=pa[0]?esc(pa[0].authorName||'Left'):'Left';
+    const nameB=pa[1]?esc(pa[1].authorName||'Right'):'Right';
+    btnA.textContent=pa[0]?`Vote ${nameA}`:'Vote Left';
+    btnB.textContent=pa[1]?`Vote ${nameB}`:'Vote Right';
+    btnA.disabled=!pa[0]; btnB.disabled=!pa[1];
+  }
 }
 
 async function checkPairVoted(chalId,pair,pairIdx){
   if(!pair||!pair[0]) return;
+  const voteRef=db.collection('challengeVotes').doc(`${CU.uid}_${chalId}_${pairIdx}`);
+  const snap=await voteRef.get();
   const btnA=document.getElementById(`va-${chalId}`);
   const btnB=document.getElementById(`vb2-${chalId}`);
-
-  // ── Reset buttons to clean active state immediately ──
-  // This MUST happen synchronously before the async Firestore check
-  // so the user never sees stale voted state from a previous pair
-  const nameA=pair[0]?esc(pair[0].authorName||'Left'):'Left';
-  const nameB=pair[1]?esc(pair[1].authorName||'Right'):'Right';
-  if(btnA){
-    btnA.className='vbtn vbtn-a';
-    btnA.textContent=`Vote ${nameA}`;
-    btnA.disabled=!pair[0];
-    btnA.removeAttribute('disabled');
-    if(!pair[0]) btnA.disabled=true;
-  }
-  if(btnB){
-    btnB.className='vbtn vbtn-b';
-    btnB.textContent=`Vote ${nameB}`;
-    btnB.disabled=!pair[1];
-    btnB.removeAttribute('disabled');
-    if(!pair[1]) btnB.disabled=true;
-  }
-
-  // ── Key vote by the specific matchup (sorted entry IDs) not slot position ──
-  // This means: voting entry2 vs entry3 is always a separate vote from
-  // entry1 vs entry2, even if they appear in the same slot at different times
-  const idA=pair[0]?.id||'';
-  const idB=pair[1]?.id||'';
-  // Sort so the key is the same regardless of which side each entry is on
-  const [sortedA,sortedB]=[idA,idB].sort();
-  const voteKey=`${CU.uid}_${chalId}_${sortedA}_${sortedB}`;
-  const voteRef=db.collection('challengeVotes').doc(voteKey);
-  const snap=await voteRef.get();
-  if(!snap.exists) return; // fresh matchup — buttons already reset above
-
-  // Already voted on this exact matchup — show which side they picked
-  const {votedEntryId} = snap.data();
-  const votedSide = idA===votedEntryId ? 'a' : 'b';
+  if(!snap.exists) return;
+  const {votedEntryId,entryAId,entryBId} = snap.data();
+  // Determine which button to mark based on which entry is currently on which side
+  // pair[0] is current left entry, pair[1] is current right entry
+  const votedSide = pair[0]?.id===votedEntryId ? 'a' : 'b';
   if(btnA){
     btnA.disabled=true;
     if(votedSide==='a'){btnA.className='vbtn voted';btnA.textContent='✓ Your Vote';}
-    else btnA.disabled=true;
   }
   if(btnB){
     btnB.disabled=true;
     if(votedSide==='b'){btnB.className='vbtn voted';btnB.textContent='✓ Your Vote';}
-    else btnB.disabled=true;
   }
-  if(pair[0]&&pair[1]) loadPairProgress(chalId,idA,idB);
+  if(pair[0]&&pair[1]) loadPairProgress(chalId,pair[0].id,pair[1].id);
 }
 
 async function castVote(chalId,side,btn){
+  // Find current visible pair index
   const swiper=document.getElementById(`bs-${chalId}`);
   if(!swiper)return;
   const pairIdx=Math.round(swiper.scrollLeft/swiper.offsetWidth);
+  const voteRef=db.collection('challengeVotes').doc(`${CU.uid}_${chalId}_${pairIdx}`);
+  const existing=await voteRef.get();
+  if(existing.exists){showToast('Already voted on this pair!');return;}
+  // Find the two entries in this pair
   const pairs=swiper.querySelectorAll('.battle-pair');
   const pair=pairs[pairIdx];
   if(!pair)return;
-
+  const sides=pair.querySelectorAll('.battle-side');
+  // Get entry IDs from the like button IDs
+  /*const getEntryId=(sideEl)=>{
+    const likeBtn=sideEl.querySelector('[id^="like-act-"]');
+    if(!likeBtn)return null;
+    const sideId=likeBtn.id.replace('like-act-','');
+    // sideId format: chalId-side-pairIdx
+    return null; // We'll use data attribute instead
+  };*/
+  // Store entry IDs in pair div as data attributes when building
   const entryAId=pair.dataset.entryA;
   const entryBId=pair.dataset.entryB;
-  if(!entryAId||!entryBId){showToast('Invalid pair — cannot vote.');return;}
-
-  // Key by sorted entry IDs so A-vs-B and B-vs-A are the same matchup
-  const [sortedA,sortedB]=[entryAId,entryBId].sort();
-  const voteKey=`${CU.uid}_${chalId}_${sortedA}_${sortedB}`;
-  const voteRef=db.collection('challengeVotes').doc(voteKey);
-
-  const existing=await voteRef.get();
-  if(existing.exists){showToast('Already voted on this matchup!');return;}
-
-  const votedEntryId=side==='a'?entryAId:entryBId;
-
-  // Write vote — store both original-order and sorted IDs for querying
-  await voteRef.set({
-    chalId, pairIdx, side,
-    entryAId, entryBId,
-    sortedA, sortedB,
-    votedEntryId,
-    userId:CU.uid, createdAt:ts()
-  });
-
-  // Increment totals
-  await db.collection('challenges').doc(chalId).update({
-    totalVotes:firebase.firestore.FieldValue.increment(1)
-  });
-  if(side==='a') await db.collection('entries').doc(entryAId).update({votes:firebase.firestore.FieldValue.increment(1)});
-  if(side==='b') await db.collection('entries').doc(entryBId).update({votes:firebase.firestore.FieldValue.increment(1)});
-
-  // Mark voted button, disable both
-  btn.className='vbtn voted';
-  btn.textContent='✓ Your Vote';
-  btn.disabled=true;
-  const otherBtnId=side==='a'?`vb2-${chalId}`:`va-${chalId}`;
-  const otherBtn=document.getElementById(otherBtnId);
-  if(otherBtn) otherBtn.disabled=true;
-
+const votedEntryId = side === 'a' ? entryAId : entryBId;
+await voteRef.set({ chalId, pairIdx, side, entryAId, entryBId, votedEntryId, userId: CU.uid, createdAt: ts() });
+await db.collection('challenges').doc(chalId).update({totalVotes:firebase.firestore.FieldValue.increment(1)});
+  // Increment voted entry's vote count
+  if(side==='a'&&entryAId) await db.collection('entries').doc(entryAId).update({votes:firebase.firestore.FieldValue.increment(1)});
+  if(side==='b'&&entryBId) await db.collection('entries').doc(entryBId).update({votes:firebase.firestore.FieldValue.increment(1)});
+  btn.className='vbtn voted'; btn.textContent='✓ Voted!'; btn.disabled=true;
+  document.getElementById(side==='a'?`vb2-${chalId}`:`va-${chalId}`)?.setAttribute('disabled','true');
   showToast('✓ Vote counted!');
-  loadPairProgress(chalId,entryAId,entryBId);
+  if(entryAId&&entryBId) loadPairProgress(chalId,entryAId,entryBId);
 }
 
 async function loadPairProgress(chalId,entryAId,entryBId){

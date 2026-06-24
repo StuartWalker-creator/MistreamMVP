@@ -70,66 +70,31 @@ function askPushPermission(){
   });
 }
 
-// Send a push to a specific user by their uid (external_id)
-// Used when: new challenge created, challenge won, voted on
-// NOTE: this sends via OneSignal REST API — needs your REST API key
-// For client-side MVP we write to Firestore and use a Cloud Function
-// OR we use OneSignal's Firestore extension. For now we store the
-// payload in Firestore and a simple relay picks it up.
-// SIMPLEST approach for zero-server MVP: call OneSignal's REST API
-// directly from client with your REST key (acceptable for MVP,
-// replace with a Cloud Function for production)
+// ── Push helpers — route through Netlify Function proxy ──
+// REST key lives only in Netlify env vars, never in this file.
+// Proxy: POST /.netlify/functions/push
+
 async function pushToUser(toUid, title, message){
-  if(!ONESIGNAL_APP_ID||ONESIGNAL_APP_ID==='YOUR_ONESIGNAL_APP_ID')return;
-  // Requires your OneSignal REST API key — set below
-  // Get it from: OneSignal dashboard → Settings → Keys & IDs → REST API Key
-  const REST_KEY = 'YOUR_ONESIGNAL_REST_KEY';
-  if(!REST_KEY||REST_KEY==='YOUR_ONESIGNAL_REST_KEY')return;
+  if(!toUid||toUid===CU?.uid)return; // never push to yourself
   try{
-    await fetch('https://onesignal.com/api/v1/notifications',{
+    await fetch('/.netlify/functions/push',{
       method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'Authorization':`Basic ${REST_KEY}`
-      },
-      body:JSON.stringify({
-        app_id: ONESIGNAL_APP_ID,
-        include_aliases:{ external_id:[toUid] },
-        target_channel:'push',
-        headings:{ en: title },
-        contents:{ en: message },
-        // Small icon shown in notification tray on Android
-        small_icon:'icon-192',
-        // Tap opens MiStream
-        url: window.location.origin
-      })
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ mode:'user', toUid, title, message,
+        url: window.location.origin })
     });
-  }catch(e){ console.warn('OneSignal push failed',e); }
+  }catch(e){ console.warn('pushToUser failed',e); }
 }
 
-// Push to ALL users — used when admin creates a new challenge
-// Uses OneSignal segments (All = everyone subscribed)
 async function pushToAll(title, message){
-  if(!ONESIGNAL_APP_ID||ONESIGNAL_APP_ID==='YOUR_ONESIGNAL_APP_ID')return;
-  const REST_KEY = 'YOUR_ONESIGNAL_REST_KEY';
-  if(!REST_KEY||REST_KEY==='YOUR_ONESIGNAL_REST_KEY')return;
   try{
-    await fetch('https://onesignal.com/api/v1/notifications',{
+    await fetch('/.netlify/functions/push',{
       method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'Authorization':`Basic ${REST_KEY}`
-      },
-      body:JSON.stringify({
-        app_id: ONESIGNAL_APP_ID,
-        included_segments:['Total Subscribed'],
-        headings:{ en: title },
-        contents:{ en: message },
-        small_icon:'icon-192',
-        url: window.location.origin
-      })
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ mode:'all', title, message,
+        url: window.location.origin })
     });
-  }catch(e){ console.warn('OneSignal broadcast failed',e); }
+  }catch(e){ console.warn('pushToAll failed',e); }
 }
 
 // ═══════════════════════════════════
@@ -201,7 +166,8 @@ function initApp(){
   setMyId();
   trackSession();
   listenNotifs();
-  //requestNotifPermission();
+  // OneSignal handles all push permission — requestNotifPermission removed
+  // to avoid double permission prompts competing with OneSignal
   initOneSignal();
   askPushPermission();
   showScr('arena');
@@ -956,6 +922,18 @@ async function castVote(chalId,side,btn){
 
   showToast('✓ Vote counted!');
   loadPairProgress(chalId,entryAId,entryBId);
+  // Notify the author of the voted entry
+  const votedEntry = side==='a' ? votedEntryId : votedEntryId;
+  // Get author of the entry that was voted for
+  db.collection('entries').doc(votedEntryId).get().then(snap=>{
+    if(!snap.exists)return;
+    const authorId=snap.data().authorId;
+    if(authorId&&authorId!==CU.uid){
+      addNotif(authorId,'vote',
+        `${CUD.username||'Someone'} voted for your photo in a challenge!`,
+        'entries', votedEntryId);
+    }
+  }).catch(()=>{});
 }
 
 async function loadPairProgress(chalId,entryAId,entryBId){
@@ -1205,7 +1183,7 @@ async function submitJoin(){
     });
     CUD.challengesJoined=(CUD.challengesJoined||0)+1;
     // Notify challenge creator
-    addNotif(joinTarget.chalCreatorId||'','join',`${CUD.username} submitted an entry to your challenge "${joinTarget.chalTitle}"!`,'challenges',joinTarget.chalId);
+    addNotif(joinTarget.chalCreatorId||'','entry',`${CUD.username} submitted an entry to your challenge "${joinTarget.chalTitle}"!`,'challenges',joinTarget.chalId);
     closeJoin();
     showToast('📸 Photo submitted!');
     initArena();
@@ -1363,7 +1341,7 @@ async function toggleFollow(uid,btn){
     await db.collection('users').doc(uid).update({followers:firebase.firestore.FieldValue.increment(1)});
     await db.collection('users').doc(CU.uid).update({following:firebase.firestore.FieldValue.increment(1)});
    /* if(btn){btn.textContent='Supporting';btn.classList.add('flw');}*/
-    addNotif(uid,'join',`${CUD.username} Supported you.`,'','');
+    addNotif(uid,'support',`${CUD.username} started supporting you.`,'users',CU.uid);
   }
 }
 
@@ -1429,6 +1407,18 @@ async function submitComment(){
   // Update counter in UI
   const cnt=document.getElementById(`com-cnt-${comTarget.docId}`);
   if(cnt) cnt.textContent=fmtN((parseInt(cnt.textContent.replace(/[^0-9]/g,''))||0)+1);
+  // Notify the author of the post being commented on
+  db.collection(comTarget.collection).doc(comTarget.docId).get().then(snap=>{
+    if(!snap.exists)return;
+    const d=snap.data();
+    const authorId=d.authorId||d.creatorId;
+    if(authorId&&authorId!==CU.uid){
+      const label=comTarget.collection==='challenges'?'your challenge':'your photo';
+      addNotif(authorId,'comment',
+        `${CUD.username||'Someone'} commented on ${label}: "${text.slice(0,60)}${text.length>60?'…':''}"`,
+        comTarget.collection, comTarget.docId);
+    }
+  }).catch(()=>{});
 }
 function buildComment(d,commentId){
   const div=document.createElement('div'); div.className='com-item';
@@ -1471,6 +1461,14 @@ async function likeComment(commentId,btn){
       btn.classList.add('liked');
       const fresh=await comRef.get();
       if(cnt) cnt.textContent=Math.max(0,fresh.data()?.likes||0);
+      // Notify comment author
+      const comSnap=await comRef.get();
+      const comAuthor=comSnap.data()?.authorId;
+      if(comAuthor&&comAuthor!==CU.uid){
+        addNotif(comAuthor,'comment_like',
+          `${CUD.username||'Someone'} liked your comment.`,
+          comTarget?.collection||'', comTarget?.docId||'');
+      }
     }
   }catch(e){ console.warn('likeComment error',e); }
   btn.dataset.pending='0';
@@ -1530,7 +1528,18 @@ async function initNotifs(){
   if(snap.empty){body.innerHTML='<div class="notif-empty"><i class="fa-regular fa-bell"></i><p>No notifications yet.<br/>Win a challenge to get recognized.</p></div>';return;}
   body.innerHTML='';
   const batch=db.batch();
-  const iconMap={win:'fa-solid fa-trophy',join:'fa-solid fa-shield-halved',vote:'fa-solid fa-thumbs-up'};
+  const iconMap={
+    win:'fa-solid fa-trophy',
+    challenge:'fa-solid fa-flag',
+    entry:'fa-solid fa-shield-halved',
+    vote:'fa-solid fa-thumbs-up',
+    comment:'fa-regular fa-comment-dots',
+    comment_like:'fa-solid fa-heart',
+    support:'fa-solid fa-people-arrows',
+    leaderboard:'fa-solid fa-ranking-star',
+    mention:'fa-solid fa-at',
+    join:'fa-solid fa-shield-halved', // legacy
+  };
   snap.forEach(doc=>{
     const d=doc.data();
     const type=d.type||'join';
@@ -1696,19 +1705,38 @@ async function showResults(chalId) {
   document.getElementById('results-title').textContent = isEnded ? 'Challenge Results' : 'Live Standings';
 }
 
-async function addNotif(toUid,type,message,refCollection,refId){
+// Notification type → push title + icon map
+const NOTIF_META = {
+  win:        { icon:'🏆', title:'You won!'              },
+  challenge:  { icon:'📸', title:'New challenge!'        },
+  entry:      { icon:'⚔️',  title:'New challenger!'      },
+  vote:       { icon:'👍', title:'Someone liked you!'   },
+  comment:    { icon:'💬', title:'New comment!'          },
+  comment_like:{ icon:'❤️', title:'Comment liked!'       },
+  support:    { icon:'💪', title:'New supporter!'        },
+  leaderboard:{ icon:'📈', title:'Rank update!'          },
+  mention:    { icon:'@',  title:'You were mentioned!'   },
+};
+
+// Single function: writes in-app Firestore notification
+// AND fires background push via Netlify proxy
+async function addNotif(toUid, type, message, refCollection, refId, skipPush=false){
   if(!toUid||toUid===CU.uid)return;
-  await db.collection('notifications').add({toUid,type,message,refCollection,refId,read:false,createdAt:ts()});
-}
-async function requestNotifPermission(){
-  if(!('Notification' in window))return;
-  if(Notification.permission==='default'){
-    setTimeout(async()=>{
-      const p=await Notification.requestPermission();
-      if(p==='granted') showToast('🔔 Notifications on!');
-    },5000);
+  // Write in-app notification to Firestore
+  await db.collection('notifications').add({
+    toUid, type, message, refCollection, refId:refId||'',
+    read:false, createdAt:ts()
+  });
+  // Fire background push (won't spam — addNotif is called for meaningful events)
+  if(!skipPush){
+    const meta=NOTIF_META[type]||{ icon:'🔔', title:'MiStream' };
+    const pushTitle=`${meta.icon} ${meta.title}`;
+    pushToUser(toUid, pushTitle, message);
   }
 }
+// requestNotifPermission removed — OneSignal's askPushPermission
+// handles all browser push permission prompts. Having both caused
+// double prompts and competing service worker registrations.
 
 // ═══════════════════════════════════
 // WINNER ANNOUNCEMENT
@@ -2091,6 +2119,15 @@ function initLeaderboard(){
           ${myRowHTML}
           ${rowsHTML||'<div style="padding:24px;text-align:center;color:rgba(255,255,255,.25);font-size:13px;">More players coming soon</div>'}
         </div>`;
+
+    // Check if current user's rank improved since last visit
+    if(myRank>0){
+      const lastRank=parseInt(localStorage.getItem(`ms_rank_${CU.uid}`)||'9999');
+      if(myRank<lastRank&&lastRank!==9999){
+        showToast(`📈 You moved up to #${myRank} on the leaderboard!`);
+      }
+      localStorage.setItem(`ms_rank_${CU.uid}`,myRank);
+    }
 
     }, err=>{
       body.innerHTML=`<div class="lb-empty"><i class="fa-solid fa-triangle-exclamation"></i><h3>Error loading</h3><p>${err.message}</p></div>`;

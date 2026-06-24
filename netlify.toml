@@ -1,0 +1,14 @@
+[build]
+  # Your site files are at the root — index.html, app.js, style.css etc.
+  publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  # Use Node 18 for the push proxy function
+  node_bundler = "esbuild"
+
+# Redirect /.netlify/functions/* to the functions runtime
+[[redirects]]
+  from = "/.netlify/functions/*"
+  to   = "/.netlify/functions/:splat"
+  status = 200

@@ -1508,7 +1508,7 @@ function listenNotifs() {
 
     reg.showNotification('MiStream', {
       body: d.message || 'New notification',
-      icon: '/icon-192.png',
+      icon: '/icon-192.jpg',
       tag: change.doc.id
     });
 

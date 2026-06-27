@@ -122,26 +122,6 @@ let regPhotoFile=null;
 let isMuted=true;
 let curPairVids=[];
 
-// Ensure all score/stats fields exist on user doc — safe for old accounts
-// Uses set+merge so it never overwrites existing values, only fills gaps
-function patchUserFields(){
-  if(!CU||!CUD)return;
-  const defaults={
-    challengeWins:0, challengeLosses:0,
-    challengesCreated:0, challengesJoined:0,
-    totalVotesReceived:0, followers:0,
-    currentStreak:0, demonSlays:0, weeklyEntries:0,
-  };
-  const missing={};
-  Object.keys(defaults).forEach(k=>{
-    if(CUD[k]===undefined||CUD[k]===null) missing[k]=defaults[k];
-  });
-  if(!Object.keys(missing).length)return;
-  db.collection('users').doc(CU.uid).set(missing,{merge:true})
-    .then(()=>{ Object.assign(CUD,missing); })
-    .catch(()=>{});
-}
-
 // ═══════════════════════════════════
 // INIT
 // ═══════════════════════════════════
@@ -182,9 +162,6 @@ function initApp(){
   document.getElementById('app').classList.remove('hidden');
   // Check admin role from Firestore user doc
   isAdmin = (CUD.role === 'admin');
-  // One-time patch: ensure score fields exist on older accounts
-  // that were created before these fields were introduced
-  patchUserFields();
   setTopAv();
   setMyId();
   trackSession();
@@ -928,27 +905,12 @@ async function castVote(chalId,side,btn){
     userId:CU.uid, createdAt:ts()
   });
 
-  // Increment challenge total
+  // Increment totals
   await db.collection('challenges').doc(chalId).update({
     totalVotes:firebase.firestore.FieldValue.increment(1)
   });
-  // Increment the voted entry's vote count
-  const votedEntryRef=db.collection('entries').doc(votedEntryId);
-  await votedEntryRef.update({votes:firebase.firestore.FieldValue.increment(1)});
-  // Also increment the OTHER entry's vote-against count (useful for stats later)
-  const otherEntryId=side==='a'?entryBId:entryAId;
-  // Increment the WINNER entry author's totalVotesReceived on their user doc
-  // This is what triggers the leaderboard onSnapshot to fire live
-  votedEntryRef.get().then(snap=>{
-    if(!snap.exists)return;
-    const authorId=snap.data().authorId;
-    if(authorId){
-      // Use set+merge so totalVotesReceived is created if missing on old accounts
-      db.collection('users').doc(authorId).set({
-        totalVotesReceived:firebase.firestore.FieldValue.increment(1)
-      },{merge:true}).catch(()=>{});
-    }
-  }).catch(()=>{});
+  if(side==='a') await db.collection('entries').doc(entryAId).update({votes:firebase.firestore.FieldValue.increment(1)});
+  if(side==='b') await db.collection('entries').doc(entryBId).update({votes:firebase.firestore.FieldValue.increment(1)});
 
   // Mark voted button, disable both
   btn.className='vbtn voted';
@@ -1546,7 +1508,7 @@ function listenNotifs() {
 
     reg.showNotification('MiStream', {
       body: d.message || 'New notification',
-      icon: '/icon-192.png',
+      icon: '/icon-192.jpg',
       tag: change.doc.id
     });
 
@@ -1940,19 +1902,11 @@ function calcWinScore(u){
 }
 
 // ── Main leaderboard score ────────────────────────
-// Weights designed so votes during live challenges create meaningful rank movement:
-//   Win score:   aged win points × 10  (wins are the top signal — aged so recent wins count more)
-//   Vote score:  votes received  × 3   (raised so active-challenge votes move rank visibly)
-//   Entry score: entries joined  × 5   (participation still rewarded)
-//
-// Example: 50 votes during live challenge = 150pts
-//          1 recent win (age <7d)         = 5×10 = 50pts
-//          → heavy voting can beat inactive winners during a live challenge
-//          → but wins compound over time and stay valuable
+// Win score (aged) + entries submitted + votes received
 function calcScore(u){
   const winScore  = calcWinScore(u) * 10;
-  const entryScore= (u.challengesJoined||0) * 5;
-  const voteScore = (u.totalVotesReceived||0) * 3;
+  const entryScore= (u.challengesJoined||0) * 8;   // every submission counts
+  const voteScore = (u.totalVotesReceived||0) * 1;  // quality signal
   return winScore + entryScore + voteScore;
 }
 
@@ -2093,13 +2047,11 @@ function initLeaderboard(){
   body.innerHTML=`<div class="lb-loading"><div class="spin"></div><span>Loading rankings...</span></div>`;
   if(lbUnsub){ lbUnsub(); lbUnsub=null; }
 
-  // Fetch ALL users with no orderBy — avoids Firestore excluding documents
-  // where totalVotesReceived field doesn't exist (users registered before
-  // the field was added would be silently missing from an orderBy query).
-  // Client-side calcScore handles all sorting correctly.
-  // onSnapshot still fires live on any user document change.
+  // Fetch top 100 by challengeWins — then re-sort client-side by full score
+  // (Firestore index: challengeWins desc)
   lbUnsub=db.collection('users')
-    .limit(200)
+    .orderBy('challengeWins','desc')
+    .limit(100)
     .onSnapshot(snap=>{
       if(snap.empty){
         body.innerHTML=`

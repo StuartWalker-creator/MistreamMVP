@@ -122,26 +122,6 @@ let regPhotoFile=null;
 let isMuted=true;
 let curPairVids=[];
 
-// Ensure all score/stats fields exist on user doc — safe for old accounts
-// Uses set+merge so it never overwrites existing values, only fills gaps
-function patchUserFields(){
-  if(!CU||!CUD)return;
-  const defaults={
-    challengeWins:0, challengeLosses:0,
-    challengesCreated:0, challengesJoined:0,
-    totalVotesReceived:0, followers:0,
-    currentStreak:0, demonSlays:0, weeklyEntries:0,
-  };
-  const missing={};
-  Object.keys(defaults).forEach(k=>{
-    if(CUD[k]===undefined||CUD[k]===null) missing[k]=defaults[k];
-  });
-  if(!Object.keys(missing).length)return;
-  db.collection('users').doc(CU.uid).set(missing,{merge:true})
-    .then(()=>{ Object.assign(CUD,missing); })
-    .catch(()=>{});
-}
-
 // ═══════════════════════════════════
 // INIT
 // ═══════════════════════════════════
@@ -182,9 +162,6 @@ function initApp(){
   document.getElementById('app').classList.remove('hidden');
   // Check admin role from Firestore user doc
   isAdmin = (CUD.role === 'admin');
-  // One-time patch: ensure score fields exist on older accounts
-  // that were created before these fields were introduced
-  patchUserFields();
   setTopAv();
   setMyId();
   trackSession();
@@ -943,10 +920,9 @@ async function castVote(chalId,side,btn){
     if(!snap.exists)return;
     const authorId=snap.data().authorId;
     if(authorId){
-      // Use set+merge so totalVotesReceived is created if missing on old accounts
-      db.collection('users').doc(authorId).set({
+      db.collection('users').doc(authorId).update({
         totalVotesReceived:firebase.firestore.FieldValue.increment(1)
-      },{merge:true}).catch(()=>{});
+      }).catch(()=>{});
     }
   }).catch(()=>{});
 
@@ -2093,13 +2069,14 @@ function initLeaderboard(){
   body.innerHTML=`<div class="lb-loading"><div class="spin"></div><span>Loading rankings...</span></div>`;
   if(lbUnsub){ lbUnsub(); lbUnsub=null; }
 
-  // Fetch ALL users with no orderBy — avoids Firestore excluding documents
-  // where totalVotesReceived field doesn't exist (users registered before
-  // the field was added would be silently missing from an orderBy query).
-  // Client-side calcScore handles all sorting correctly.
-  // onSnapshot still fires live on any user document change.
+  // Order by totalVotesReceived so onSnapshot fires on EVERY vote cast
+  // during active challenges — not just on win events.
+  // Client-side calcScore re-sorts into final displayed rank.
+  // Firestore index needed: totalVotesReceived desc
+  // (auto-created on first query or add manually in Firebase Console)
   lbUnsub=db.collection('users')
-    .limit(200)
+    .orderBy('totalVotesReceived','desc')
+    .limit(100)
     .onSnapshot(snap=>{
       if(snap.empty){
         body.innerHTML=`
